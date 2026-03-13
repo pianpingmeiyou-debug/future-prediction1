@@ -71,11 +71,21 @@ function setupOnboarding() {
     refreshAllViews();
   });
 
+  const openSettings = $("openSettingsOverlay");
+  if (openSettings) {
+    openSettings.addEventListener("click", () => {
+      overlay.classList.add("visible");
+    });
+  }
+
   // Auto close onboarding if user data already exists
   if (state.user) {
     overlay.classList.remove("visible");
     // set UI controls from stored user for consistency
     careerYear.value = String(state.user.careerYear ?? 1);
+    $("salary").value = state.user.salary || "";
+    $("companyName").value = state.user.companyName || "";
+    $("bonusAmount").value = state.user.bonusAmount || "";
   }
 }
 
@@ -143,7 +153,68 @@ function setupCalendar() {
 
   setupAddOverlay();
   setupAddEventForms();
+  setupEditOverlay();
   renderCalendar();
+}
+
+function openEditModal(id) {
+  const ev = state.events.find(e => e.id === id);
+  if (!ev) return;
+  
+  $("editEventId").value = ev.id;
+  $("editEventTitle").value = ev.title;
+  $("editEventAmount").value = ev.amount;
+
+  $("edit-overlay").classList.add("visible");
+}
+
+function setupEditOverlay() {
+  const overlay = $("edit-overlay");
+  const close = $("closeEditOverlay");
+
+  close.addEventListener("click", () => overlay.classList.remove("visible"));
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("visible");
+  });
+
+  $("saveEditEvent").addEventListener("click", () => {
+    const id = $("editEventId").value;
+    const title = $("editEventTitle").value.trim();
+    const amount = Number($("editEventAmount").value) || 0;
+    
+    const ev = state.events.find(e => e.id === id);
+    if (ev && title) {
+      ev.title = title;
+      ev.amount = amount;
+      saveState();
+      renderCalendar();
+      refreshHomeAnalysis();
+    }
+    overlay.classList.remove("visible");
+  });
+
+  $("deleteFutureEvents").addEventListener("click", () => {
+    const id = $("editEventId").value;
+    const ev = state.events.find(e => e.id === id);
+    if (!ev) return;
+    
+    if (confirm("この予定を今月以降の予定からも削除しますか？")) {
+      const isAuto = ev.aiGenerated || ev.type === "installment" || ev.type === "recurring";
+      const targetTitle = ev.title;
+      const targetDate = ev.date;
+
+      state.events = state.events.filter(e => {
+        if (e.id === id) return false;
+        if (isAuto && e.title === targetTitle && e.date >= targetDate) return false;
+        return true;
+      });
+
+      saveState();
+      renderCalendar();
+      refreshHomeAnalysis();
+      overlay.classList.remove("visible");
+    }
+  });
 }
 
 function setupAddOverlay() {
@@ -211,13 +282,14 @@ function setupAddEventForms() {
 
   $("addRecurringEvent").addEventListener("click", () => {
     const title = $("recurringTitle").value;
-    const day = Number($("recurringDay").value || 0);
+    const dayInput = $("recurringDay").value;
     const amount = Number($("recurringAmount").value || 0);
 
-    if (day < 1 || day > 28 || amount <= 0) {
-      alert("支払日（1〜28）と月額を入力してください。");
+    if (!dayInput || amount <= 0) {
+      alert("支払日(毎月)と月額を入力してください。");
       return;
     }
+    const day = new Date(dayInput).getDate();
 
     addRecurringEvent({ title, day, amount });
     $("recurringDay").value = "";
@@ -472,6 +544,37 @@ function renderCalendar() {
         : "ローン・分割：-- 円/月";
   }
 
+  const detailsList = $("paymentDetailsList");
+  if (detailsList) {
+    detailsList.innerHTML = "";
+    if (monthEvents.length === 0) {
+      detailsList.innerHTML = `<li class="payment-detail-item"><span class="payment-detail-name" style="color:var(--color-text-soft)">今月の支払いはありません</span></li>`;
+    } else {
+      monthEvents.forEach(ev => {
+        let titleDisplay = ev.title;
+        if (ev.type === "installment" && ev.installment) {
+          titleDisplay += ` (${ev.installment})`;
+        }
+        const amtYen = Math.round((ev.amount || 0) * 10000);
+        
+        const li = document.createElement("li");
+        li.className = "payment-detail-item";
+        li.innerHTML = `
+          <span class="payment-detail-name">${titleDisplay}</span>
+          <span class="payment-detail-amount">${amtYen.toLocaleString("ja-JP")} <span style="font-size:10px;font-weight:normal">円</span></span>
+          <button class="edit-btn" data-id="${ev.id}">編集</button>
+        `;
+        detailsList.appendChild(li);
+      });
+      
+      detailsList.querySelectorAll(".edit-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          openEditModal(e.target.dataset.id);
+        });
+      });
+    }
+  }
+
   $("calendarSummary").textContent =
     totalYen > 0
       ? `この月の予定・天引き 合計目安：${totalYen.toLocaleString(
@@ -703,7 +806,7 @@ function renderIncomeLine(yearOffset) {
   // background grid
   ctx.clearRect(0, 0, w, h);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+  ctx.strokeStyle = "rgba(10, 35, 80, 0.08)";
   for (let i = 0; i <= 4; i++) {
     const y = pad.t + (plotH * i) / 4;
     ctx.beginPath();
@@ -711,6 +814,20 @@ function renderIncomeLine(yearOffset) {
     ctx.lineTo(pad.l + plotW, y);
     ctx.stroke();
   }
+
+  // x-axis
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(10, 35, 80, 0.2)";
+  ctx.beginPath();
+  ctx.moveTo(pad.l, h - pad.b);
+  ctx.lineTo(pad.l + plotW, h - pad.b);
+  ctx.stroke();
+
+  // y-axis
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, h - pad.b);
+  ctx.stroke();
 
   function xAt(idx) {
     return pad.l + (plotW * idx) / (series.length - 1);
@@ -739,7 +856,7 @@ function renderIncomeLine(yearOffset) {
       ctx.fill();
     }
 
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.strokeStyle = color;
@@ -756,14 +873,14 @@ function renderIncomeLine(yearOffset) {
     ctx.shadowBlur = 0; // reset
   }
 
-  // salary (bright neon blue) and takehome (neon pink/mint)
-  drawLine(series.map((p) => p.salary), "#00d2ff");
-  drawLine(series.map((p) => p.takeHome), "#00ffcc", ["rgba(0, 255, 204, 0.4)", "rgba(0, 255, 204, 0.0)"]);
+  // salary (purple) and takehome (blue)
+  drawLine(series.map((p) => p.salary), "#8b5cf6", ["rgba(139, 92, 246, 0.2)", "rgba(139, 92, 246, 0.0)"]);
+  drawLine(series.map((p) => p.takeHome), "#3b82f6", ["rgba(59, 130, 246, 0.2)", "rgba(59, 130, 246, 0.0)"]);
 
   // bonus markers
-  ctx.fillStyle = "#ff8a00";
-  ctx.shadowColor = "#ff8a00";
-  ctx.shadowBlur = 10;
+  ctx.fillStyle = "#ef4444";
+  ctx.shadowColor = "rgba(239, 68, 68, 0.5)";
+  ctx.shadowBlur = 8;
   series.forEach((p, i) => {
     if (p.bonus <= 0) return;
     const x = xAt(i);
@@ -777,14 +894,14 @@ function renderIncomeLine(yearOffset) {
     ctx.beginPath();
     ctx.arc(x, y, 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#ff8a00";
-    ctx.shadowColor = "#ff8a00";
-    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#ef4444";
+    ctx.shadowColor = "rgba(239, 68, 68, 0.5)";
+    ctx.shadowBlur = 8;
   });
   ctx.shadowBlur = 0;
 
-  // x labels (white for dark canvas)
-  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  // x labels (dark for light canvas)
+  ctx.fillStyle = "rgba(10, 35, 80, 0.6)";
   ctx.font = "12px system-ui, -apple-system, Segoe UI, sans-serif";
   series.forEach((p, i) => {
     if (i % 2 === 1) return;
@@ -877,25 +994,73 @@ function refreshFurusatoView() {
   $("furusatoLimit").textContent =
     limit > 0 ? `${limit.toLocaleString("ja-JP")} 円まで可能` : "-- 円まで可能";
 
-  const yes = $("sideJobYes");
-  const no = $("sideJobNo");
-
-  yes.addEventListener("click", () => {
-    yes.classList.add("selected");
-    no.classList.remove("selected");
-    $("furusatoResultMain").textContent = "確定申告がおすすめです。";
-    $("furusatoResultDetail").textContent =
-      "副業収入がある場合は、ふるさと納税も含めて一度まとめて確定申告するパターンが多いです。";
+  const startBtn = $("startFurusatoNav");
+  startBtn.addEventListener("click", () => {
+    startBtn.classList.add("hidden");
+    $("furusatoProgress").classList.remove("hidden");
+    $("progressFill").style.width = "0%";
+    $("q1-block").classList.remove("hidden");
   });
 
-  no.addEventListener("click", () => {
-    no.classList.add("selected");
-    yes.classList.remove("selected");
-    $("furusatoResultMain").textContent =
-      "ワンストップ申請 が使えそうです。";
-    $("furusatoResultDetail").textContent =
-      "会社員で副業がなければ、5つの自治体までなら確定申告なしでOKなことが多いです。";
+  const chips = document.querySelectorAll(".furusato-chip");
+  chips.forEach(chip => {
+    chip.addEventListener("click", () => {
+      // Find siblings and remove selected
+      const siblings = chip.parentElement.querySelectorAll(".chip");
+      siblings.forEach(s => s.classList.remove("selected"));
+      chip.classList.add("selected");
+      
+      const qNum = parseInt(chip.dataset.q, 10);
+      
+      if (qNum === 1) {
+        $("q1-block").classList.add("hidden");
+        $("q2-block").classList.remove("hidden");
+        $("progressFill").style.width = "33%";
+      } else if (qNum === 2) {
+        $("q2-block").classList.add("hidden");
+        $("q3-block").classList.remove("hidden");
+        $("progressFill").style.width = "66%";
+      } else if (qNum === 3) {
+        $("q3-block").classList.add("hidden");
+        showFurusatoResult();
+        $("progressFill").style.width = "100%";
+      }
+    });
   });
+
+  $("resetFurusatoNav").addEventListener("click", () => {
+    chips.forEach(c => c.classList.remove("selected"));
+    startBtn.classList.remove("hidden");
+    $("furusatoProgress").classList.add("hidden");
+    $("q1-block").classList.add("hidden");
+    $("q2-block").classList.add("hidden");
+    $("q3-block").classList.add("hidden");
+    $("furusatoResultBlock").classList.add("hidden");
+  });
+}
+
+function showFurusatoResult() {
+  const q1 = document.querySelector('.furusato-chip[data-q="1"].selected')?.dataset.val === 'yes';
+  const q2 = document.querySelector('.furusato-chip[data-q="2"].selected')?.dataset.val === 'yes';
+  const q3 = document.querySelector('.furusato-chip[data-q="3"].selected')?.dataset.val === 'yes';
+
+  const needsKakutei = q1 || q2 || q3;
+  const main = $("furusatoResultMain");
+  const detail = $("furusatoResultDetail");
+
+  $("furusatoResultBlock").classList.remove("hidden");
+
+  if (needsKakutei) {
+    main.textContent = "確定申告 が必要になりそうです。";
+    let reasons = [];
+    if (q1) reasons.push("副業収入等がある");
+    if (q2) reasons.push("医療費控除を受ける");
+    if (q3) reasons.push("6自治体以上に寄付する");
+    detail.textContent = `${reasons.join("、")}ため、ワンストップ特例ではなく確定申告を行いましょう。`;
+  } else {
+    main.textContent = "ワンストップ特例申請 が使えそうです。";
+    detail.textContent = "会社員で条件をすべて満たしているため、確定申告なしでふるさと納税が完了します。書類の郵送やオンライン申請を忘れずに！";
+  }
 }
 
 // ---------- Boot ----------
