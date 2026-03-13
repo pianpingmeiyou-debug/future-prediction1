@@ -155,46 +155,58 @@
       <main id="main-content">
         <!-- Home -->
         <section id="tab-home" class="tab-page active">
-          <header class="page-header">
-            <h1>🏠 ホーム</h1>
-            <p class="page-caption">あなたの今と未来の手取りをシンプルに表示</p>
+          <header class="page-header home-header">
+            <div>
+              <h1>🏠 ホーム</h1>
+              <p class="page-caption">あなたの今と未来のお金を見える化</p>
+            </div>
+            <button id="openSettingsOverlay" class="ghost-button edit-settings-btn" title="設定の変更">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px; vertical-align:middle; position:relative; top:-1px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> 初期設定を再編集
+            </button>
           </header>
 
-          <div class="card-grid">
-            <div class="card">
+          <div class="card-grid home-grid">
+            <div class="card glass-card premium-card">
+              <div class="card-icon">💰</div>
               <h2>予想年収</h2>
-              <p class="big-number" id="predictedIncome">-- 万円</p>
+              <p class="big-number premium-number" id="predictedIncome">-- 万円</p>
               <p class="sub-text" id="predictedIncomeNote">
-                入力情報からだいたいの年収を予測します。
+                最新の入力情報に基づいたAI予測
               </p>
             </div>
 
-            <div class="card card-warning">
+            <div class="card glass-card warning-card">
+              <div class="card-icon">⚠️</div>
               <h2>2年目の壁アラート</h2>
-              <p id="secondYearAlertMain">来年6月から住民税がスタート</p>
-              <p id="secondYearAlertDetail">手取り −18,000円/月 くらいの目安です。</p>
+              <p class="alert-main" id="secondYearAlertMain">来年6月から住民税がスタート</p>
+              <p class="alert-detail" id="secondYearAlertDetail">手取り −18,000円/月 くらいの目安です。</p>
             </div>
 
-            <div class="card">
-              <h2>不安メーター</h2>
-              <div id="anxietyMeter" class="anxiety-meter">
-                <span class="badge badge-safe">🟢 安定</span>
+            <div class="home-split">
+              <div class="card glass-card half-card">
+                <div class="card-icon">🧭</div>
+                <h2>不安メーター</h2>
+                <div id="anxietyMeter" class="anxiety-meter">
+                  <span class="badge badge-safe">🟢 安定</span>
+                </div>
+                <p id="anxietyReason" class="sub-text compact-sub">
+                  安心基準に合わせた状態
+                </p>
               </div>
-              <p id="anxietyReason" class="sub-text">
-                あなたの安心基準に合わせて状態を表示します。
-              </p>
+
+              <div class="card glass-card half-card">
+                <div class="card-icon">🧠</div>
+                <h2>今月の出費分析</h2>
+                <p id="thisMonthAnalysis" class="ai-comment compact-sub">
+                  カレンダーからバランスを分析
+                </p>
+              </div>
             </div>
 
-            <div class="card">
+            <div class="card glass-card">
+              <div class="card-icon">✨</div>
               <h2>AIキャリア分析</h2>
-              <ul id="careerAnalysisList" class="bullet-list"></ul>
-            </div>
-
-            <div class="card">
-              <h2>今月の出費AI分析</h2>
-              <p id="thisMonthAnalysis" class="ai-comment">
-                今月のカレンダー情報から、出費のバランスをコメントします。
-              </p>
+              <ul id="careerAnalysisList" class="bullet-list premium-list"></ul>
             </div>
           </div>
         </section>
@@ -211,6 +223,10 @@
             <div id="calendarTopTotalYen" class="month-summary-amount">-- 円</div>
             <div id="calendarTopLoanYen" class="month-summary-sub">
               ローン・分割：-- 円/月
+            </div>
+            <div class="payment-details">
+              <div class="payment-details-title">支払の詳細</div>
+              <ul id="paymentDetailsList" class="payment-details-list"></ul>
             </div>
           </div>
 
@@ -352,13 +368,10 @@
               </div>
 
               <div class="form-section small-gap">
-                <label for="recurringDay">支払日</label>
+                <label for="recurringDay">支払日(毎月)</label>
                 <input
                   id="recurringDay"
-                  type="number"
-                  min="1"
-                  max="28"
-                  placeholder="1〜28"
+                  type="date"
                 />
               </div>
 
@@ -378,6 +391,48 @@
 
               <button id="addRecurringEvent" class="primary-button">
                 登録してカレンダーに反映
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Edit overlay (Calendar) -->
+        <div id="edit-overlay" class="overlay">
+          <div class="overlay-card">
+            <div class="overlay-top">
+              <div>
+                <h2 class="overlay-title">詳細を編集</h2>
+                <p class="overlay-caption">内容の修正や削除ができます</p>
+              </div>
+              <button id="closeEditOverlay" class="ghost-button">閉じる</button>
+            </div>
+
+            <div class="form-stack">
+              <input type="hidden" id="editEventId" />
+              
+              <div class="form-section small-gap">
+                <label for="editEventTitle">イベント名</label>
+                <input id="editEventTitle" type="text" />
+              </div>
+
+              <div class="form-section small-gap">
+                <label for="editEventAmount">およその金額</label>
+                <div class="input-row">
+                  <input
+                    id="editEventAmount"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                  />
+                  <span class="suffix">万円</span>
+                </div>
+              </div>
+
+              <button id="deleteFutureEvents" class="ghost-button danger-button" style="width: 100%; margin-top: 16px; padding: 10px; border-radius: 999px;">
+                🗑 今月から削除する
+              </button>
+              <button id="saveEditEvent" class="primary-button">
+                保存する
               </button>
             </div>
           </div>
@@ -411,7 +466,7 @@
                   <span class="dot dot-bonus"></span> ボーナス
                 </span>
               </div>
-              <canvas id="incomeCanvas" class="line-canvas" width="900" height="260"></canvas>
+              <canvas id="incomeCanvas" class="line-canvas" width="600" height="400"></canvas>
               <div id="incomeTooltip" class="graph-tooltip hidden"></div>
             </div>
           </div>
@@ -457,30 +512,60 @@
             </p>
           </div>
 
-          <div class="card">
-            <h2>Yes / No ナビ</h2>
-            <p class="question-label">副業収入ありますか？</p>
-            <div class="chip-row">
-              <button id="sideJobYes" type="button" class="chip">
-                YES
-              </button>
-              <button
-                id="sideJobNo"
-                type="button"
-                class="chip selected"
-              >
-                NO
-              </button>
+          <div class="card" id="furusatoNavCard">
+            <h2>🍖 ふるさと納税 診断テスト</h2>
+            <p class="sub-text">3つの質問で、あなたのふるさと納税スタイルを診断！</p>
+
+            <div id="furusatoProgress" class="progress-bar hidden">
+              <div id="progressFill" class="progress-fill"></div>
             </div>
 
-            <div class="result-box">
-              <p class="label">結果</p>
+            <button id="startFurusatoNav" class="primary-button fun-button" style="margin-top:12px;">
+              🚀 診断スタート！
+            </button>
+
+            <div id="q1-block" class="question-block hidden fun-question">
+              <div class="question-icon">💼</div>
+              <h3>副業探偵</h3>
+              <p class="question-label">Q1. 副業収入やフリーランス収入はありますか？</p>
+              <div class="chip-row">
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="yes">YES 😎</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="no">NO 🙅‍♂️</button>
+              </div>
+            </div>
+
+            <div id="q2-block" class="question-block hidden fun-question">
+              <div class="question-icon">🏥</div>
+              <h3>医療費探偵</h3>
+              <p class="question-label">Q2. 医療費を年間10万円以上払いましたか？</p>
+              <div class="chip-row">
+                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="yes">YES 💊</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="no">NO 😌</button>
+              </div>
+            </div>
+
+            <div id="q3-block" class="question-block hidden fun-question">
+              <div class="question-icon">🗺️</div>
+              <h3>寄付マスター</h3>
+              <p class="question-label">Q3. 寄付したい自治体は6ヶ所以上ですか？</p>
+              <div class="chip-row">
+                <button type="button" class="chip furusato-chip fun-chip" data-q="3" data-val="yes">YES 🌟</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="3" data-val="no">NO 🤔</button>
+              </div>
+            </div>
+
+            <div id="furusatoResultBlock" class="result-box hidden fun-result">
+              <div class="result-icon">🎉</div>
+              <p class="label">診断結果</p>
               <p id="furusatoResultMain" class="result-main">
-                ワンストップ申請 が使えそうです。
+                --
               </p>
               <p id="furusatoResultDetail" class="result-detail">
-                会社員で副業がなければ、5つの自治体までなら確定申告なしでOKなことが多いです。
+                --
               </p>
+              <button id="resetFurusatoNav" class="ghost-button fun-reset" style="margin-top: 10px; width: 100%;">
+                🔄 もう一度診断する
+              </button>
             </div>
           </div>
         </section>
@@ -489,15 +574,19 @@
       <!-- Bottom tab bar -->
       <nav class="tab-bar">
         <button class="tab-button active" data-target="home">
+          <span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
           <span class="tab-label">ホーム</span>
         </button>
         <button class="tab-button" data-target="calendar">
+          <span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
           <span class="tab-label">カレンダー</span>
         </button>
         <button class="tab-button" data-target="income">
+          <span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></span>
           <span class="tab-label">収入予測</span>
         </button>
         <button class="tab-button" data-target="furusato">
+          <span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg></span>
           <span class="tab-label">ふるさと</span>
         </button>
       </nav>
