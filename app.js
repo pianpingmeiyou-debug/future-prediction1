@@ -703,7 +703,7 @@ function renderIncomeLine(yearOffset) {
   // background grid
   ctx.clearRect(0, 0, w, h);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = "rgba(155, 177, 255, 0.35)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
   for (let i = 0; i <= 4; i++) {
     const y = pad.t + (plotH * i) / 4;
     ctx.beginPath();
@@ -719,10 +719,32 @@ function renderIncomeLine(yearOffset) {
     return pad.t + plotH - (plotH * value) / (maxY || 1);
   }
 
-  // draw line helper
-  function drawLine(values, color) {
-    ctx.lineWidth = 3;
+  // draw line helper with glow and fill
+  function drawLine(values, color, fillColors) {
+    if (fillColors) {
+      ctx.beginPath();
+      values.forEach((v, i) => {
+        const x = xAt(i);
+        const y = yAt(v);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.lineTo(xAt(values.length - 1), yAt(0));
+      ctx.lineTo(xAt(0), yAt(0));
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(0, pad.t, 0, h - pad.b);
+      grad.addColorStop(0, fillColors[0]);
+      grad.addColorStop(1, fillColors[1]);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    ctx.lineWidth = 4;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
     ctx.beginPath();
     values.forEach((v, i) => {
       const x = xAt(i);
@@ -731,30 +753,43 @@ function renderIncomeLine(yearOffset) {
       else ctx.lineTo(x, y);
     });
     ctx.stroke();
+    ctx.shadowBlur = 0; // reset
   }
 
-  // salary (blue) and takehome (mint)
-  drawLine(series.map((p) => p.salary), "#4b7dff");
-  drawLine(series.map((p) => p.takeHome), "#1acfb0");
+  // salary (bright neon blue) and takehome (neon pink/mint)
+  drawLine(series.map((p) => p.salary), "#00d2ff");
+  drawLine(series.map((p) => p.takeHome), "#00ffcc", ["rgba(0, 255, 204, 0.4)", "rgba(0, 255, 204, 0.0)"]);
 
   // bonus markers
-  ctx.fillStyle = "#ff9c42";
+  ctx.fillStyle = "#ff8a00";
+  ctx.shadowColor = "#ff8a00";
+  ctx.shadowBlur = 10;
   series.forEach((p, i) => {
     if (p.bonus <= 0) return;
     const x = xAt(i);
     const y = yAt(p.salary + p.bonus);
     ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
     ctx.fill();
+    // white center
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ff8a00";
+    ctx.shadowColor = "#ff8a00";
+    ctx.shadowBlur = 10;
   });
+  ctx.shadowBlur = 0;
 
-  // x labels
-  ctx.fillStyle = "rgba(21, 33, 59, 0.75)";
+  // x labels (white for dark canvas)
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
   ctx.font = "12px system-ui, -apple-system, Segoe UI, sans-serif";
   series.forEach((p, i) => {
     if (i % 2 === 1) return;
     const x = xAt(i);
-    ctx.fillText(`${p.month}月`, x - 10, h - 10);
+    ctx.fillText(`${p.month}月`, x - 10, h - 8);
   });
 
   // Tooltip interaction
