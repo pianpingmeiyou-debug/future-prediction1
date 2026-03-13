@@ -141,8 +141,23 @@ function setupCalendar() {
     renderCalendar();
   });
 
+  setupAddOverlay();
   setupAddEventForms();
   renderCalendar();
+}
+
+function setupAddOverlay() {
+  const overlay = $("add-overlay");
+  const open = $("openAddOverlay");
+  const close = $("closeAddOverlay");
+
+  open.addEventListener("click", () => overlay.classList.add("visible"));
+  close.addEventListener("click", () => overlay.classList.remove("visible"));
+
+  // backdrop click to close (but keep clicks inside card)
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("visible");
+  });
 }
 
 function setupAddEventForms() {
@@ -191,6 +206,7 @@ function setupAddEventForms() {
 
     renderCalendar();
     refreshHomeAnalysis();
+    $("add-overlay").classList.remove("visible");
   });
 
   $("addRecurringEvent").addEventListener("click", () => {
@@ -209,6 +225,7 @@ function setupAddEventForms() {
 
     renderCalendar();
     refreshHomeAnalysis();
+    $("add-overlay").classList.remove("visible");
   });
 }
 
@@ -244,17 +261,41 @@ function updateInstallmentOptions(method) {
 }
 
 function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
-  const base = {
-    id: crypto.randomUUID(),
-    title,
-    type: "oneTime",
-    date,
-    amount,
-    paymentMethod,
-    installment,
-  };
+  // 一括払いはその月に全額、ローン/分割は「月々」に割ってカレンダーへ展開する
+  if (paymentMethod === "lump") {
+    state.events.push({
+      id: crypto.randomUUID(),
+      title,
+      type: "oneTime",
+      date,
+      amount,
+      paymentMethod,
+      installment: "",
+    });
+  } else {
+    const times = parseInstallmentTimes(installment);
+    const per = times > 0 ? amount / times : amount;
+    const first = new Date(date);
 
-  state.events.push(base);
+    for (let i = 0; i < times; i++) {
+      const d = new Date(
+        first.getFullYear(),
+        first.getMonth() + i,
+        first.getDate()
+      );
+      state.events.push({
+        id: crypto.randomUUID(),
+        title: i === 0 ? `${title}（月々）` : `${title}（月々）`,
+        type: "installment",
+        date: d.toISOString().slice(0, 10),
+        amount: Math.round(per * 10000) / 10000,
+        paymentMethod,
+        installment,
+        aiGenerated: true,
+        loanMonthlyYen: Math.round(per * 10000),
+      });
+    }
+  }
 
   // AI自動生成 (単純ロジック)
   if (title.includes("車") || title.includes("自動車")) {
@@ -294,32 +335,6 @@ function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
         aiGenerated: true,
       });
     });
-  }
-
-  // 分割払い処理（ざっくり）
-  if (paymentMethod !== "lump") {
-    const times = parseInstallmentTimes(installment);
-    if (times > 1) {
-      const per = Math.round((amount * 10000) / times) / 10000;
-      const first = new Date(date);
-      for (let i = 1; i < times; i++) {
-        const d = new Date(
-          first.getFullYear(),
-          first.getMonth() + i,
-          first.getDate()
-        );
-        state.events.push({
-          id: crypto.randomUUID(),
-          title: `${title}（分割${i + 1}/${times}）`,
-          type: "installment",
-          date: d.toISOString().slice(0, 10),
-          amount: per,
-          paymentMethod,
-          installment,
-          aiGenerated: true,
-        });
-      }
-    }
   }
 
   saveState();
@@ -436,21 +451,32 @@ function renderCalendar() {
     daysContainer.appendChild(el);
   });
 
-  const total = monthEvents.reduce((sum, ev) => sum + (ev.amount || 0), 0);
-  const totalYen = Math.round(total * 10000);
-  const hasInstallment = monthEvents.some(
-    (ev) => ev.type === "installment" || (ev.paymentMethod && ev.paymentMethod !== "lump" && ev.paymentMethod !== "monthly" && ev.paymentMethod !== "auto")
-  );
+  const totalMan = monthEvents.reduce((sum, ev) => sum + (ev.amount || 0), 0);
+  const totalYen = Math.round(totalMan * 10000);
+
+  const loanMonthlyYen = monthEvents
+    .filter((ev) => ev.type === "installment")
+    .reduce((sum, ev) => sum + Math.round((ev.amount || 0) * 10000), 0);
+
+  // 1-2: 「この月の予定・天引き 合計目安」は、新しいクラスの方で大きく表示
+  const topTotal = $("calendarTopTotalYen");
+  const topLoan = $("calendarTopLoanYen");
+  if (topTotal) {
+    topTotal.textContent =
+      totalYen > 0 ? `${totalYen.toLocaleString("ja-JP")} 円` : "-- 円";
+  }
+  if (topLoan) {
+    topLoan.textContent =
+      loanMonthlyYen > 0
+        ? `ローン・分割：${loanMonthlyYen.toLocaleString("ja-JP")} 円/月`
+        : "ローン・分割：-- 円/月";
+  }
 
   $("calendarSummary").textContent =
     totalYen > 0
-      ? hasInstallment
-        ? `この月の予定・天引き 合計目安：${totalYen.toLocaleString(
-            "ja-JP"
-          )} 円（ローン・分割を含めた月々の支払い）`
-        : `この月の予定・天引き 合計目安：${totalYen.toLocaleString(
-            "ja-JP"
-          )} 円`
+      ? `この月の予定・天引き 合計目安：${totalYen.toLocaleString(
+          "ja-JP"
+        )} 円`
       : "この月の大きな出費はまだ登録されていません。";
 }
 
@@ -594,16 +620,30 @@ function setupIncomeGraph() {
       buttons.forEach((b) => b.classList.remove("selected"));
       btn.classList.add("selected");
       const offset = Number(btn.dataset.yearOffset || 0);
-      renderIncomeGraph(offset);
+      renderIncomeLine(offset);
     })
   );
-  renderIncomeGraph(0);
+  renderIncomeLine(0);
+  window.addEventListener("resize", () => {
+    const selected = document.querySelector(
+      'section#tab-income .year-toggle .chip.selected'
+    );
+    const offset = selected ? Number(selected.dataset.yearOffset || 0) : 0;
+    renderIncomeLine(offset);
+  });
 }
 
-function renderIncomeGraph(yearOffset) {
-  const container = $("incomeGraph");
+function renderIncomeLine(yearOffset) {
+  const canvas = $("incomeCanvas");
   const tooltip = $("incomeTooltip");
-  container.innerHTML = "";
+  if (!canvas) return;
+
+  // Resize for crisp rendering
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || 320;
+  const cssHeight = canvas.clientHeight || 320;
+  canvas.width = Math.floor(cssWidth * dpr);
+  canvas.height = Math.floor(cssHeight * dpr);
 
   const user = state.user;
   if (!user) return;
@@ -626,9 +666,7 @@ function renderIncomeGraph(yearOffset) {
   const taxBaseIncome = salaryThisYear + bonusTotal / 10;
   const taxRate = user.careerYear + yearOffset >= 2 ? 0.23 : 0.18;
 
-  const maxIncome = (salaryThisYear * (1 - taxRate)) / 12 + bonusPer * 0.8;
-
-  months.forEach((m) => {
+  const series = months.map((m) => {
     const monthSalary = salaryThisYear / 12;
     const isBonusMonth =
       bonusTimes === 2
@@ -640,54 +678,110 @@ function renderIncomeGraph(yearOffset) {
     const tax = taxIncome * taxRate;
     const takeHome = Math.max(taxIncome - tax, 0);
 
-    const monthEl = document.createElement("div");
-    monthEl.className = "graph-month";
-
-    const bars = document.createElement("div");
-    bars.className = "graph-bars";
-
-    const incomeBar = document.createElement("div");
-    incomeBar.className = "bar income";
-    incomeBar.style.height = `${(takeHome / maxIncome) * 100 || 5}%`;
-    bars.appendChild(incomeBar);
-
-    const salaryBar = document.createElement("div");
-    salaryBar.className = "bar salary";
-    salaryBar.style.height = `${(monthSalary / maxIncome) * 80 || 5}%`;
-    bars.appendChild(salaryBar);
-
-    const bonusBar = document.createElement("div");
-    bonusBar.className = "bar bonus";
-    bonusBar.style.height = `${(bonus / maxIncome) * 80 || 0}%`;
-    bars.appendChild(bonusBar);
-
-    const label = document.createElement("div");
-    label.className = "graph-month-label";
-    label.textContent = `${m + 1}月`;
-
-    monthEl.appendChild(bars);
-    monthEl.appendChild(label);
-    container.appendChild(monthEl);
-
-    monthEl.addEventListener("mousemove", (e) => {
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left + 8;
-      const y = e.clientY - rect.top - 10;
-
-      tooltip.classList.remove("hidden");
-      tooltip.style.left = `${x}px`;
-      tooltip.style.top = `${y}px`;
-
-      const taxBreakdown = buildTaxBreakdown(taxIncome, user, yearOffset);
-      tooltip.innerHTML = `<strong>${m + 1}月の目安</strong><br />
-        手取り 約${takeHome.toFixed(0)}万円<br />
-        ${taxBreakdown}`;
-    });
-
-    monthEl.addEventListener("mouseleave", () => {
-      tooltip.classList.add("hidden");
-    });
+    return {
+      month: m + 1,
+      takeHome,
+      salary: monthSalary,
+      bonus,
+      taxIncome,
+    };
   });
+
+  const maxY = Math.max(
+    ...series.map((p) => Math.max(p.takeHome, p.salary + p.bonus))
+  );
+
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const w = cssWidth;
+  const h = cssHeight;
+  const pad = { l: 16, r: 16, t: 16, b: 28 };
+  const plotW = w - pad.l - pad.r;
+  const plotH = h - pad.t - pad.b;
+
+  // background grid
+  ctx.clearRect(0, 0, w, h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(155, 177, 255, 0.35)";
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (plotH * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(pad.l + plotW, y);
+    ctx.stroke();
+  }
+
+  function xAt(idx) {
+    return pad.l + (plotW * idx) / (series.length - 1);
+  }
+  function yAt(value) {
+    return pad.t + plotH - (plotH * value) / (maxY || 1);
+  }
+
+  // draw line helper
+  function drawLine(values, color) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const x = xAt(i);
+      const y = yAt(v);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  // salary (blue) and takehome (mint)
+  drawLine(series.map((p) => p.salary), "#4b7dff");
+  drawLine(series.map((p) => p.takeHome), "#1acfb0");
+
+  // bonus markers
+  ctx.fillStyle = "#ff9c42";
+  series.forEach((p, i) => {
+    if (p.bonus <= 0) return;
+    const x = xAt(i);
+    const y = yAt(p.salary + p.bonus);
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // x labels
+  ctx.fillStyle = "rgba(21, 33, 59, 0.75)";
+  ctx.font = "12px system-ui, -apple-system, Segoe UI, sans-serif";
+  series.forEach((p, i) => {
+    if (i % 2 === 1) return;
+    const x = xAt(i);
+    ctx.fillText(`${p.month}月`, x - 10, h - 10);
+  });
+
+  // Tooltip interaction
+  const rectProvider = () => canvas.getBoundingClientRect();
+  function hideTip() {
+    tooltip.classList.add("hidden");
+  }
+
+  canvas.onmouseleave = hideTip;
+  canvas.onmousemove = (e) => {
+    const rect = rectProvider();
+    const x = e.clientX - rect.left;
+    const idx = Math.round(((x - pad.l) / plotW) * (series.length - 1));
+    const safeIdx = Math.max(0, Math.min(series.length - 1, idx));
+    const p = series[safeIdx];
+
+    const tipX = e.clientX - rect.left + 10;
+    const tipY = e.clientY - rect.top - 12;
+    tooltip.classList.remove("hidden");
+    tooltip.style.left = `${tipX}px`;
+    tooltip.style.top = `${tipY}px`;
+
+    const taxBreakdown = buildTaxBreakdown(p.taxIncome, user, yearOffset);
+    tooltip.innerHTML = `<strong>${p.month}月の目安</strong><br />
+      手取り 約${p.takeHome.toFixed(0)}万円<br />
+      ${taxBreakdown}`;
+  };
 
   refreshStabilityText();
 }
