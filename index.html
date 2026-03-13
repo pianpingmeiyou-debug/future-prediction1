@@ -17,16 +17,12 @@
           <form id="onboarding-form">
             <section class="form-section">
               <h2>社会人何年目</h2>
-              <div class="slider-row">
-                <input
-                  type="range"
-                  id="careerYear"
-                  min="1"
-                  max="4"
-                  value="1"
-                />
-                <span id="careerYearLabel" class="pill pill-soft">1年目</span>
-              </div>
+              <select id="careerYear">
+                <option value="1">1年目</option>
+                <option value="2">2年目</option>
+                <option value="3">3年目</option>
+                <option value="4">4年目以上</option>
+              </select>
               <p class="hint">住民税や税金の変化を自動で計算します。</p>
             </section>
 
@@ -67,22 +63,15 @@
 
             <section class="form-section">
               <h2>ボーナス額（1回あたり）</h2>
-              <div class="chip-row" id="bonusAmountGroup">
-                <button type="button" data-value="20" class="chip">
-                  20万
-                </button>
-                <button type="button" data-value="40" class="chip">
-                  40万
-                </button>
-                <button type="button" data-value="60" class="chip">
-                  60万
-                </button>
-                <button type="button" data-value="100" class="chip">
-                  100万
-                </button>
-                <button type="button" data-value="unknown" class="chip selected">
-                  わからない
-                </button>
+              <div class="input-row">
+                <input
+                  type="number"
+                  id="bonusAmount"
+                  min="0"
+                  step="1"
+                  placeholder="例）40"
+                />
+                <span class="suffix">万円</span>
               </div>
             </section>
 
@@ -137,29 +126,27 @@
               <h2>あなたにとって安心とは？</h2>
               <div class="chip-row" id="anxietyTypeGroup">
                 <button type="button" data-value="1" class="chip">
-                  貯金維持
+                  現在の貯金額に満足があり、維持または増やしたい
                 </button>
                 <button type="button" data-value="2" class="chip">
-                  貯金減少不安
+                  現在の貯金額に不安があり、減るのが心配
                 </button>
                 <button type="button" data-value="3" class="chip">
-                  楽観
+                  急な多額出費がない限り、不安はほとんどない
                 </button>
                 <button type="button" data-value="4" class="chip">
-                  手取り安定重視
+                  毎月の手取りが安定していれば安心できる
                 </button>
                 <button type="button" data-value="5" class="chip">
-                  将来イベント不安
+                  将来の大きな出費（引っ越し・車など）が不安
                 </button>
                 <button type="button" data-value="6" class="chip selected">
-                  標準
+                  まだよく分からない（標準設定にする）
                 </button>
               </div>
             </section>
 
-            <button type="submit" class="primary-button">
-              はじめる（約3分）
-            </button>
+            <button type="submit" class="primary-button">はじめる</button>
           </form>
         </div>
       </div>
