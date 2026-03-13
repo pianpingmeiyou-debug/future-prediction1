@@ -1,453 +1,503 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FutureFlow | 未来手取りナビ</title>
-    <!-- Google Fonts: Softer Fonts (M PLUS Rounded 1c) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Onboarding -->
+      <div id="onboarding-overlay" class="overlay visible">
+        <div class="overlay-card">
+          <h1 class="app-title">FutureFlow</h1>
+          <p class="app-subtitle">3分で あなたの未来のお金を見える化</p>
 
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+          <form id="onboarding-form">
+            <section class="form-section">
+              <h2>社会人何年目</h2>
+              <div class="slider-row">
+                <input
+                  type="range"
+                  id="careerYear"
+                  min="1"
+                  max="4"
+                  value="1"
+                />
+                <span id="careerYearLabel" class="pill pill-soft">1年目</span>
+              </div>
+              <p class="hint">住民税や税金の変化を自動で計算します。</p>
+            </section>
 
-    <!-- Background Decoration (Softer, Pastel) -->
-    <div class="bg-blur blur-1"></div>
-    <div class="bg-blur blur-2"></div>
+            <section class="form-section">
+              <h2>年収（だいたいでOK）</h2>
+              <div class="input-row">
+                <input
+                  type="number"
+                  id="salary"
+                  min="0"
+                  step="10"
+                  placeholder="例）350"
+                />
+                <span class="suffix">万円</span>
+              </div>
+            </section>
 
+            <section class="form-section">
+              <h2>ボーナス</h2>
+              <div class="chip-row" id="bonusTypeGroup">
+                <button type="button" data-value="none" class="chip selected">
+                  なし
+                </button>
+                <button type="button" data-value="summer" class="chip">
+                  夏
+                </button>
+                <button type="button" data-value="winter" class="chip">
+                  冬
+                </button>
+                <button type="button" data-value="both" class="chip">
+                  夏＋冬
+                </button>
+                <button type="button" data-value="unknown" class="chip">
+                  わからない
+                </button>
+              </div>
+            </section>
 
-    <!-- Onboarding Modal -->
-    <div id="onboarding-modal" class="modal-overlay">
-        <div class="modal-content glass-panel soft-panel">
-            <h2 class="modal-title highlight-accent">未来を描こう <i class="fas fa-seedling"></i></h2>
-            <p class="modal-subtitle">いくつかの質問に答えて、あなたの未来の手取りを可視化します。</p>
+            <section class="form-section">
+              <h2>ボーナス額（1回あたり）</h2>
+              <div class="chip-row" id="bonusAmountGroup">
+                <button type="button" data-value="20" class="chip">
+                  20万
+                </button>
+                <button type="button" data-value="40" class="chip">
+                  40万
+                </button>
+                <button type="button" data-value="60" class="chip">
+                  60万
+                </button>
+                <button type="button" data-value="100" class="chip">
+                  100万
+                </button>
+                <button type="button" data-value="unknown" class="chip selected">
+                  わからない
+                </button>
+              </div>
+            </section>
 
-            <!-- Step 1: Basic Info & Years -->
-            <div id="step-1" class="step active">
-                <div class="form-group">
-                    <label for="exp-year">社会人何年目ですか？</label>
-                    <select id="exp-year">
-                        <option value="1">1年目（新卒・入社直後）</option>
-                        <option value="2">2年目</option>
-                        <option value="3">3年目以上</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="income">現在の額面年収（万円）</label>
-                    <input type="number" id="income" placeholder="例: 300" min="100" max="2000" required>
-                </div>
-                <div class="form-group">
-                    <label for="bonus-timing">ボーナスはありますか？</label>
-                    <select id="bonus-timing" onchange="toggleBonusInput()">
-                        <option value="none">なし</option>
-                        <option value="summer-winter">夏と冬（年2回）</option>
-                        <option value="unknown">わからない</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="company-size">企業規模</label>
-                    <select id="company-size">
-                        <option value="large">大企業</option>
-                        <option value="medium">中小企業</option>
-                        <option value="startup">ベンチャー企業</option>
-                        <option value="public">公務員</option>
-                        <option value="other">その他</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="industry">業種</label>
-                    <select id="industry">
-                        <option value="it">IT・通信</option>
-                        <option value="food">食品</option>
-                        <option value="auto">自動車</option>
-                        <option value="electronics">電機・電子</option>
-                        <option value="retail">小売</option>
-                        <option value="finance">金融</option>
-                        <option value="realestate">不動産</option>
-                        <option value="construction">建築</option>
-                        <option value="medical">医療・医薬品</option>
-                        <option value="service">サービス</option>
-                        <option value="energy">エネルギー</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="company-name">企業名（任意）</label>
-                    <input type="text" id="company-name" placeholder="例: Future株式会社">
-                </div>
-                <div class="form-group hidden" id="bonus-amount-group">
-                    <label for="bonus-amount">1回あたりのボーナス額（万円 / 推定）</label>
-                    <input type="number" id="bonus-amount" placeholder="例: 20">
-                </div>
-                
-                <button class="btn btn-primary mt-4 w-100" onclick="nextStep(2)">次へ <i class="fas fa-arrow-right"></i></button>
-            </div>
+            <section class="form-section">
+              <h2>企業規模</h2>
+              <div class="chip-row" id="companySizeGroup">
+                <button type="button" data-value="large" class="chip">
+                  大企業
+                </button>
+                <button type="button" data-value="sme" class="chip">
+                  中小企業
+                </button>
+                <button type="button" data-value="venture" class="chip">
+                  ベンチャー
+                </button>
+                <button type="button" data-value="public" class="chip">
+                  公務員
+                </button>
+                <button type="button" data-value="other" class="chip selected">
+                  その他
+                </button>
+              </div>
+            </section>
 
-            <!-- Step 2: Anxiety Preference -->
-            <div id="step-2" class="step">
-                <h3 class="step-title highlight-accent">あなたにとっての「安心」とは？</h3>
-                <div class="options-grid">
-                    <button class="option-btn" onclick="selectAnxietyProfile(1)">
-                        <i class="fas fa-piggy-bank text-pastel-pink"></i>
-                        <span>① 現在の貯金額に満足。<br>維持したい</span>
-                    </button>
-                    <button class="option-btn" onclick="selectAnxietyProfile(2)">
-                        <i class="fas fa-arrow-trend-down text-pastel-orange"></i>
-                        <span>② 現在の貯金に不安。<br>減るのが心配</span>
-                    </button>
-                    <button class="option-btn" onclick="selectAnxietyProfile(3)">
-                        <i class="far fa-face-smile text-pastel-green"></i>
-                        <span>③ 急な多額出費が<br>なければ不安はない</span>
-                    </button>
-                    <button class="option-btn" onclick="selectAnxietyProfile(4)">
-                        <i class="fas fa-money-bill-wave text-pastel-blue"></i>
-                        <span>④ 毎月の手取りが<br>安定していれば安心</span>
-                    </button>
-                    <button class="option-btn" onclick="selectAnxietyProfile(5)">
-                        <i class="fas fa-car-side text-pastel-purple"></i>
-                        <span>⑤ 将来の大きな出費<br>が不安</span>
-                    </button>
-                    <button class="option-btn" onclick="selectAnxietyProfile(6)">
-                        <i class="fas fa-leaf text-pastel-green"></i>
-                        <span>⑥ まだよく分からない<br>（標準）</span>
-                    </button>
-                </div>
-                <button class="btn btn-secondary mt-4 w-100" onclick="nextStep(1)"><i class="fas fa-arrow-left"></i> 戻る</button>
-            </div>
+            <section class="form-section">
+              <h2>業種</h2>
+              <select id="industry">
+                <option value="it">IT・通信</option>
+                <option value="food">食品</option>
+                <option value="auto">自動車</option>
+                <option value="electronics">電機・電子</option>
+                <option value="retail">小売</option>
+                <option value="finance">金融</option>
+                <option value="realestate">不動産</option>
+                <option value="construction">建築</option>
+                <option value="medical">医療・医薬品</option>
+                <option value="service">サービス</option>
+                <option value="energy">エネルギー</option>
+              </select>
+            </section>
+
+            <section class="form-section">
+              <h2>企業名（任意）</h2>
+              <input
+                type="text"
+                id="companyName"
+                placeholder="入力しなくてもOK"
+              />
+            </section>
+
+            <section class="form-section">
+              <h2>あなたにとって安心とは？</h2>
+              <div class="chip-row" id="anxietyTypeGroup">
+                <button type="button" data-value="1" class="chip">
+                  貯金維持
+                </button>
+                <button type="button" data-value="2" class="chip">
+                  貯金減少不安
+                </button>
+                <button type="button" data-value="3" class="chip">
+                  楽観
+                </button>
+                <button type="button" data-value="4" class="chip">
+                  手取り安定重視
+                </button>
+                <button type="button" data-value="5" class="chip">
+                  将来イベント不安
+                </button>
+                <button type="button" data-value="6" class="chip selected">
+                  標準
+                </button>
+              </div>
+            </section>
+
+            <button type="submit" class="primary-button">
+              はじめる（約3分）
+            </button>
+          </form>
         </div>
+      </div>
+
+      <!-- Main layout -->
+      <main id="main-content">
+        <!-- Home -->
+        <section id="tab-home" class="tab-page active">
+          <header class="page-header">
+            <h1>ホーム</h1>
+            <p class="page-caption">あなたの今と未来の手取りをシンプルに表示</p>
+          </header>
+
+          <div class="card-grid">
+            <div class="card">
+              <h2>予想年収</h2>
+              <p class="big-number" id="predictedIncome">-- 万円</p>
+              <p class="sub-text" id="predictedIncomeNote">
+                入力情報からだいたいの年収を予測します。
+              </p>
+            </div>
+
+            <div class="card card-warning">
+              <h2>2年目の壁アラート</h2>
+              <p id="secondYearAlertMain">来年6月から住民税がスタート</p>
+              <p id="secondYearAlertDetail">手取り −18,000円/月 くらいの目安です。</p>
+            </div>
+
+            <div class="card">
+              <h2>不安メーター</h2>
+              <div id="anxietyMeter" class="anxiety-meter">
+                <span class="badge badge-safe">🟢 安定</span>
+              </div>
+              <p id="anxietyReason" class="sub-text">
+                あなたの安心基準に合わせて状態を表示します。
+              </p>
+            </div>
+
+            <div class="card">
+              <h2>AIキャリア分析</h2>
+              <ul id="careerAnalysisList" class="bullet-list"></ul>
+            </div>
+
+            <div class="card">
+              <h2>今月の出費AI分析</h2>
+              <p id="thisMonthAnalysis" class="ai-comment">
+                今月のカレンダー情報から、出費のバランスをコメントします。
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Calendar -->
+        <section id="tab-calendar" class="tab-page">
+          <header class="page-header">
+            <h1>未来支出カレンダー</h1>
+            <p class="page-caption">この月の予定・天引きをまとめて確認</p>
+          </header>
+
+          <div class="card">
+            <div class="calendar-header">
+              <button id="prevMonth" class="ghost-button">＜</button>
+              <div>
+                <div id="calendarMonthLabel" class="calendar-month-label">
+                  2026年3月
+                </div>
+                <div id="calendarSummary" class="calendar-summary">
+                  今月の予定・天引きの合計を表示します。
+                </div>
+              </div>
+              <button id="nextMonth" class="ghost-button">＞</button>
+            </div>
+
+            <div class="calendar-legend">
+              <span class="dot dot-tax"></span> 税金・社会保険
+              <span class="dot dot-fixed"></span> 毎月の出費
+              <span class="dot dot-event"></span> 一時的な出費
+            </div>
+
+            <div class="calendar-grid">
+              <div class="calendar-weekdays">
+                <span>日</span><span>月</span><span>火</span><span>水</span
+                ><span>木</span><span>金</span><span>土</span>
+              </div>
+              <div id="calendarDays" class="calendar-days"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="add-header">
+              <h2>＋追加</h2>
+              <p class="page-caption">かんたん入力でイベントを追加</p>
+            </div>
+
+            <div class="toggle-pills">
+              <button
+                type="button"
+                id="oneTimeTab"
+                class="pill pill-filled"
+                data-mode="oneTime"
+              >
+                一時的な出費
+              </button>
+              <button
+                type="button"
+                id="recurringTab"
+                class="pill"
+                data-mode="recurring"
+              >
+                毎月の出費
+              </button>
+            </div>
+
+            <div id="oneTimeForm" class="form-stack">
+              <div class="form-section small-gap">
+                <label for="oneTimeTitle">イベント名</label>
+                <input
+                  id="oneTimeTitle"
+                  type="text"
+                  placeholder="例）車購入、引っ越し、家電購入"
+                />
+              </div>
+
+              <div class="form-section small-gap">
+                <label for="oneTimeDate">支払日</label>
+                <input id="oneTimeDate" type="date" />
+              </div>
+
+              <div class="form-section small-gap">
+                <label for="oneTimeAmount">およその金額</label>
+                <div class="input-row">
+                  <input
+                    id="oneTimeAmount"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="例）200"
+                  />
+                  <span class="suffix">万円</span>
+                </div>
+              </div>
+
+              <div class="form-section small-gap">
+                <label>支払方法</label>
+                <div class="chip-row" id="paymentMethodGroup">
+                  <button
+                    type="button"
+                    data-value="lump"
+                    class="chip selected"
+                  >
+                    一括払い
+                  </button>
+                  <button type="button" data-value="card" class="chip">
+                    クレジットカード分割
+                  </button>
+                  <button type="button" data-value="shopping" class="chip">
+                    ショッピングローン
+                  </button>
+                  <button type="button" data-value="bank" class="chip">
+                    銀行ローン
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-section small-gap" id="installmentSection">
+                <label>回数 / 期間</label>
+                <div class="chip-row" id="installmentGroup"></div>
+              </div>
+
+              <button id="addOneTimeEvent" class="primary-button small">
+                カレンダーに追加
+              </button>
+            </div>
+
+            <div id="recurringForm" class="form-stack hidden">
+              <div class="form-section small-gap">
+                <label for="recurringTitle">イベント名</label>
+                <select id="recurringTitle">
+                  <option value="家賃">家賃</option>
+                  <option value="光熱費">光熱費</option>
+                  <option value="通信費">通信費</option>
+                  <option value="サブスク">サブスク</option>
+                </select>
+              </div>
+
+              <div class="form-section small-gap">
+                <label for="recurringDay">支払日</label>
+                <input
+                  id="recurringDay"
+                  type="number"
+                  min="1"
+                  max="28"
+                  placeholder="1〜28"
+                />
+              </div>
+
+              <div class="form-section small-gap">
+                <label for="recurringAmount">月額</label>
+                <div class="input-row">
+                  <input
+                    id="recurringAmount"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="例）8"
+                  />
+                  <span class="suffix">万円</span>
+                </div>
+              </div>
+
+              <button id="addRecurringEvent" class="primary-button small">
+                登録してカレンダーに反映
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Income forecast -->
+        <section id="tab-income" class="tab-page">
+          <header class="page-header">
+            <h1>収入推定予測（3年間）</h1>
+            <p class="page-caption">シンプルなグラフで3年分の手取りイメージ</p>
+          </header>
+
+          <div class="card">
+            <div class="year-toggle">
+              <button class="chip small selected" data-year-offset="0">
+                1年目
+              </button>
+              <button class="chip small" data-year-offset="1">2年目</button>
+              <button class="chip small" data-year-offset="2">3年目</button>
+            </div>
+
+            <div class="graph-wrapper">
+              <div class="graph-header">
+                <span class="legend">
+                  <span class="dot dot-income"></span> 手取り
+                </span>
+                <span class="legend">
+                  <span class="dot dot-salary"></span> 月給予測
+                </span>
+                <span class="legend">
+                  <span class="dot dot-bonus"></span> ボーナス
+                </span>
+              </div>
+              <div id="incomeGraph" class="graph-scroll"></div>
+              <div id="incomeTooltip" class="graph-tooltip hidden"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>ざっくり税金辞典</h2>
+            <ul class="bullet-list compact">
+              <li>
+                <strong>所得税</strong>：国に払う税金。給料から自動で引かれる。
+              </li>
+              <li>
+                <strong>住民税</strong>：前年収入の税金。2年目から増える。
+              </li>
+              <li>
+                <strong>厚生年金</strong>：将来の年金。会社が半分負担。
+              </li>
+              <li>
+                <strong>健康保険</strong>：医療費を3割にする保険。
+              </li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h2>安定度</h2>
+            <p id="stabilityText" class="ai-comment">
+              手取りと出費のバランスから、ざっくり安定度を表示します。
+            </p>
+          </div>
+        </section>
+
+        <!-- Furusato -->
+        <section id="tab-furusato" class="tab-page">
+          <header class="page-header">
+            <h1>ふるさと納税ナビ</h1>
+            <p class="page-caption">上限額とやる・やらないのカンタン整理</p>
+          </header>
+
+          <div class="card">
+            <h2>あなたの上限額（目安）</h2>
+            <p id="furusatoLimit" class="big-number">-- 円まで可能</p>
+            <p class="sub-text">
+              年収と家族構成などをざっくり想定した、かなりざっくりの目安です。
+            </p>
+          </div>
+
+          <div class="card">
+            <h2>Yes / No ナビ</h2>
+            <p class="question-label">副業収入ありますか？</p>
+            <div class="chip-row">
+              <button id="sideJobYes" type="button" class="chip">
+                YES
+              </button>
+              <button
+                id="sideJobNo"
+                type="button"
+                class="chip selected"
+              >
+                NO
+              </button>
+            </div>
+
+            <div class="result-box">
+              <p class="label">結果</p>
+              <p id="furusatoResultMain" class="result-main">
+                ワンストップ申請 が使えそうです。
+              </p>
+              <p id="furusatoResultDetail" class="result-detail">
+                会社員で副業がなければ、5つの自治体までなら確定申告なしでOKなことが多いです。
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Bottom tab bar -->
+      <nav class="tab-bar">
+        <button class="tab-button active" data-target="home">
+          <span class="tab-label">ホーム</span>
+        </button>
+        <button class="tab-button" data-target="calendar">
+          <span class="tab-label">カレンダー</span>
+        </button>
+        <button class="tab-button" data-target="income">
+          <span class="tab-label">収入予測</span>
+        </button>
+        <button class="tab-button" data-target="furusato">
+          <span class="tab-label">ふるさと</span>
+        </button>
+      </nav>
     </div>
 
-    <!-- App Container -->
-    <div id="app-container" class="app-container hidden">
-        
-        <!-- Tab 1: Home -->
-        <main id="tab-home" class="tab-content active">
-            <header class="app-header">
-                <div>
-                    <h1 class="logo-text">ホーム</h1>
-                    <p class="greeting" id="home-greeting">お疲れ様です！</p>
-                </div>
-                <button class="icon-btn" onclick="openSettings()" title="設定"><i class="fas fa-cog"></i></button>
-            </header>
-
-            <div class="content-body">
-                <div class="glass-panel soft-panel profile-card">
-                    <div class="profile-stat">
-                        <span class="stat-label">予想年収（ボーナス込）</span>
-                        <div class="stat-value-wrap">
-                            <span class="stat-value" id="disp-income">0</span><span class="stat-unit">万円</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Dynamic AI Alert -->
-                <div class="glass-panel soft-panel ai-alert-card" id="home-dynamic-alert">
-                    <div class="ai-header">
-                        <i class="fas fa-robot text-pastel-blue"></i> AIからのメッセージ（税金）
-                    </div>
-                    <div class="ai-content">
-                        <strong id="ai-alert-title">2年目の壁</strong>
-                        <p id="ai-alert-text">2027年6月から住民税が引かれ始めます。月額 約--円 マイナスになりますので準備をしておきましょう。</p>
-                    </div>
-                </div>
-
-                <!-- Company Analysis AI Card -->
-                <div class="glass-panel soft-panel ai-alert-card mt-3" id="home-company-analysis" style="border-left-color: var(--primary);">
-                    <div class="ai-header">
-                        <i class="fas fa-chart-pie text-pastel-purple"></i> AIキャリア分析
-                    </div>
-                    <div class="ai-content">
-                        <strong id="ai-company-title">分析中...</strong>
-                        <p id="ai-company-text">あなたの属性や業種に基づいた、一般的な収入モデルとキャリアアドバイスを生成しています。</p>
-                    </div>
-                </div>
-
-                <!-- Monthly Expense Analysis AI Card -->
-                <div class="glass-panel soft-panel ai-alert-card mt-3" id="home-monthly-analysis" style="border-left-color: var(--status-safe);">
-                    <div class="ai-header">
-                        <i class="fas fa-wallet text-pastel-green"></i> 今月の出費分析
-                    </div>
-                    <div class="ai-content">
-                        <strong id="ai-monthly-title">分析中...</strong>
-                        <p id="ai-monthly-text">今月の予定を取得しています。</p>
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Tab 2: Calendar -->
-        <main id="tab-calendar" class="tab-content hidden">
-            <header class="app-header">
-                <h1 class="logo-text">未来支出カレンダー</h1>
-            </header>
-            
-            <div class="content-body">
-                <div class="calendar-controls">
-                    <button class="icon-btn round-btn" onclick="changeCalendarMonth(-1)"><i class="fas fa-chevron-left"></i></button>
-                    <h2 class="current-month-display" id="cal-month-display">2026年10月</h2>
-                    <button class="icon-btn round-btn" onclick="changeCalendarMonth(1)"><i class="fas fa-chevron-right"></i></button>
-                </div>
-
-                <div class="glass-panel soft-panel calendar-card mt-2">
-                    <div class="card-header flex-between mb-2">
-                        <h3>この月の予定・天引き</h3>
-                        <button class="btn-small btn-primary" onclick="addExpense()"><i class="fas fa-plus"></i> 追加</button>
-                    </div>
-                    
-                    <div class="calendar-timeline empty-state" id="expense-list">
-                        <!-- Items injected here -->
-                        <div class="text-center text-sub py-2">予定はありません 🌱</div>
-                    </div>
-                </div>
-
-                <!-- Monthly Calendar Grid (Visual) -->
-                <div class="glass-panel soft-panel calendar-card mt-3">
-                    <div class="calendar-header-grid text-center mb-1">
-                        <div class="day-label text-pastel-pink">日</div>
-                        <div class="day-label">月</div>
-                        <div class="day-label">火</div>
-                        <div class="day-label">水</div>
-                        <div class="day-label">木</div>
-                        <div class="day-label">金</div>
-                        <div class="day-label text-pastel-blue">土</div>
-                    </div>
-                    <div id="calendar-grid-container" class="calendar-grid">
-                        <!-- Grid injected here via JS -->
-                    </div>
-                </div>
-                
-                <div class="ai-hint-small mt-2">
-                    <i class="fas fa-lightbulb"></i> <span id="cal-ai-hint">「車購入」と入力すると、将来の車検代・税金も自動で追加されます！</span>
-                </div>
-            </div>
-        </main>
-
-        <!-- Tab 3: Prediction -->
-        <main id="tab-prediction" class="tab-content hidden">
-            <header class="app-header">
-                <h1 class="logo-text">収入推定予測 (3年間)</h1>
-            </header>
-
-            <div class="content-body">
-                <!-- Anxiety Meter & AI Status -->
-                <div class="glass-panel soft-panel status-card mb-3" id="anxiety-meter">
-                    <div class="status-icon" id="status-icon">🟢</div>
-                    <div class="status-info">
-                        <div class="status-title" id="status-title">安定</div>
-                        <div class="status-reason" id="status-reason">現状、大きな不安要素はありません。</div>
-                    </div>
-                    <div class="status-profile-tag" id="status-tag">基準: 標準設定</div>
-                </div>
-
-                <!-- Chart Container (Scrollable horizontally) -->
-                <div class="glass-panel soft-panel chart-card">
-                    <p class="text-center text-sub small-text mb-1"><i class="fas fa-arrows-alt-h"></i> スワイプで未来を確認</p>
-                    <div class="chart-scroll-wrapper">
-                        <div class="chart-container" style="width: 1200px; height: 300px;">
-                            <canvas id="incomeChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Tax Glossary -->
-                <div class="glass-panel soft-panel glossary-card mt-3">
-                    <h3><i class="fas fa-book-open text-pastel-orange"></i> ざっくり税金辞典</h3>
-                    <ul class="glossary-list">
-                        <li>
-                            <span class="g-term">所得税</span>
-                            <span class="g-desc">国に払う税金。給料から自動で引かれるよ。</span>
-                        </li>
-                        <li>
-                            <span class="g-term">住民税</span>
-                            <span class="g-desc">前年の収入にかかる税金。2年目から増えるよ。</span>
-                        </li>
-                        <li>
-                            <span class="g-term">厚生年金</span>
-                            <span class="g-desc">将来の年金。会社が半分払ってくれてるよ。</span>
-                        </li>
-                        <li>
-                            <span class="g-term">健康保険</span>
-                            <span class="g-desc">医療費を3割負担にするための保険だよー。</span>
-                        </li>
-                         <li>
-                            <span class="g-term">雇用保険</span>
-                            <span class="g-desc">失業した時などにもらえるお金の保険だよ。</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </main>
-
-        <!-- Tab 4: Furusato -->
-        <main id="tab-furusato" class="tab-content hidden">
-            <header class="app-header">
-                <h1 class="logo-text">ふるさと納税ナビ</h1>
-            </header>
-            
-            <div class="content-body">
-                <div class="glass-panel soft-panel furusato-card text-center">
-                    <div class="furusato-img mb-2" style="font-size: 3rem;">🍱</div>
-                    <div class="furusato-limit mb-2">
-                        <span class="text-sub">あなたの寄付上限目安：</span><br>
-                        <strong class="highlight-accent huge-text" id="furusato-amount">約 -- 円</strong>
-                    </div>
-                    <p class="mini-desc mb-4">実質2,000円負担で返礼品。<br>翌年の住民税が減ります。</p>
-                    <button class="btn btn-primary w-100 round-btn" onclick="startFurusatoNavi()">自分に合った申請方法を知る <i class="fas fa-search"></i></button>
-                </div>
-                
-                <div id="furusato-navi-area" class="glass-panel soft-panel mt-3 hidden">
-                    <div id="furusato-q1" class="furusato-step active">
-                        <p class="q-text">Q1. 副業などで給与以外の収入はありますか？（または医療費控除などをしますか？）</p>
-                        <div class="btn-group">
-                            <button class="btn btn-outline" onclick="furusatoAnswer(1, 'yes')">はい（ある）</button>
-                            <button class="btn btn-outline" onclick="furusatoAnswer(1, 'no')">いいえ</button>
-                        </div>
-                    </div>
-                    <div id="furusato-q2" class="furusato-step hidden">
-                        <p class="q-text">Q2. 寄付する自治体は1年間に5自治体以内におさまりますか？</p>
-                        <div class="btn-group">
-                            <button class="btn btn-outline" onclick="furusatoAnswer(2, 'yes')">はい（5以内）</button>
-                            <button class="btn btn-outline" onclick="furusatoAnswer(2, 'no')">いいえ（6以上）</button>
-                        </div>
-                    </div>
-                    <div id="furusato-result" class="furusato-step hidden text-center">
-                        <h3 id="f-result-title" class="highlight-accent mt-0"></h3>
-                        <p id="f-result-desc" class="mb-3"></p>
-                        <button class="btn btn-secondary w-100" onclick="document.getElementById('furusato-navi-area').classList.add('hidden')">閉じる</button>
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Bottom Navigation Bar -->
-        <nav class="bottom-nav">
-            <button class="nav-btn active" onclick="switchTab('home')">
-                <i class="fas fa-home"></i>
-                <span>ホーム</span>
-            </button>
-            <button class="nav-btn" onclick="switchTab('calendar')">
-                <i class="far fa-calendar-alt"></i>
-                <span>カレンダー</span>
-            </button>
-            <button class="nav-btn" onclick="switchTab('prediction')">
-                <i class="fas fa-chart-line"></i>
-                <span>収入予測</span>
-            </button>
-            <button class="nav-btn" onclick="switchTab('furusato')">
-                <i class="fas fa-gift"></i>
-                <span>ふるさと納税</span>
-            </button>
-        </nav>
-    </div>
-
-    <!-- Modals -->
-    <!-- Add Expense Modal -->
-    <div id="expense-modal" class="modal-overlay hidden">
-        <div class="modal-content glass-panel soft-panel" style="overflow: visible; padding-top: 2rem;">
-            <!-- Sticky Note Tabs -->
-            <div class="sticky-tabs">
-                <div id="btn-expense-temp" class="sticky-tab active" onclick="setExpenseMode('temp')">一時的な出費</div>
-                <div id="btn-expense-monthly" class="sticky-tab" onclick="setExpenseMode('monthly')">毎月の出費</div>
-            </div>
-            
-            <button class="close-btn" style="z-index: 10;" onclick="closeModal('expense-modal')"><i class="fas fa-times"></i></button>
-            <h2 class="modal-title highlight-accent mt-3">カレンダーに予定を追加 <i class="far fa-edit"></i></h2>
-
-            <!-- Temporary Expense Inputs -->
-            <div id="expense-inputs-temp">
-                <div class="form-group">
-                    <label>イベント名 (または自分で入力)</label>
-                    <input type="text" id="expense-name-temp" list="expense-suggestions" placeholder="例: 車購入、引っ越し、結婚式">
-                    <datalist id="expense-suggestions">
-                        <option value="引っ越し"></option>
-                        <option value="車購入"></option>
-                        <option value="家電購入"></option>
-                        <option value="旅行"></option>
-                        <option value="家賃"></option>
-                    </datalist>
-                </div>
-            </div>
-
-            <!-- Monthly Expense Inputs -->
-            <div id="expense-inputs-monthly" class="hidden">
-                <div class="form-group">
-                    <label>イベント名</label>
-                    <select id="expense-name-monthly">
-                        <option value="家賃">家賃</option>
-                        <option value="光熱費">光熱費</option>
-                        <option value="通信費">通信費</option>
-                        <option value="サブスク">サブスク</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label id="expense-date-label">支払日</label>
-                <!-- Changed to type="date" to select specific day -->
-                <input type="date" id="expense-date">
-            </div>
-            
-            <div class="form-group">
-                <label id="expense-cost-label">およjsonよの金額（万円）</label>
-                <input type="number" id="expense-cost" placeholder="例: 150">
-            </div>
-
-            <!-- Payment Method (Hidden in Monthly Mode) -->
-            <div id="expense-payment-section">
-                <div class="form-group">
-                    <label>支払方法</label>
-                    <select id="payment-method" onchange="toggleInstallmentSelect()">
-                        <option value="once">一括払い</option>
-                        <option value="card-split">クレジットカード分割払い</option>
-                        <option value="shopping-loan">ショッピングローン</option>
-                        <option value="bank-loan">銀行ローン</option>
-                    </select>
-                </div>
-                <div class="form-group hidden" id="installment-group">
-                    <label>分割回数</label>
-                    <select id="installment-count">
-                        <option value="3">3回</option>
-                        <option value="6">6回</option>
-                        <option value="10">10回</option>
-                        <option value="12">12回</option>
-                        <option value="24">24回</option>
-                    </select>
-                </div>
-            </div>
-
-            <button id="btn-expense-delete" class="btn btn-outline mt-4 w-100 hidden" style="border-color: var(--status-danger); color: var(--status-danger);" onclick="deleteExpense()">今月から削除する</button>
-            <button id="btn-expense-save" class="btn btn-primary mt-2 w-100" onclick="saveExpense()">追加する</button>
-        </div>
-    </div>
-    
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay hidden">
-        <div class="modal-content glass-panel soft-panel">
-            <button class="close-btn" onclick="closeModal('settings-modal')"><i class="fas fa-times"></i></button>
-            <h2 class="modal-title highlight-accent"><i class="fas fa-cog"></i> 設定</h2>
-            
-            <button class="btn btn-secondary w-100 mb-2 mt-4" onclick="openOnboardingFromSettings()">
-                <i class="fas fa-user-edit"></i> 初期設定をやり直す
-            </button>
-            <p class="text-sub small-text">※ 初期設定をやり直すとAIによる将来の予定は再計算されます</p>
-        </div>
-    </div>
-
-    <!-- AI Loading overlay for mocked feel -->
-
-    <div id="ai-loading" class="modal-overlay hidden" style="background: rgba(250,250,249,0.9);">
-        <div class="text-center">
-            <i class="fas fa-robot text-pastel-blue fa-spin fa-3x mb-3"></i>
-            <h3 class="text-main" id="ai-loading-text">AIが未来を計算中...</h3>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
-</body>
+    <script src="./app.js"></script>
+  </body>
 </html>
+
