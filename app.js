@@ -39,17 +39,8 @@ function $(id) {
 function setupOnboarding() {
   const overlay = $("onboarding-overlay");
   const careerYear = $("careerYear");
-  const careerYearLabel = $("careerYearLabel");
-
-  careerYear.addEventListener("input", () => {
-    const value = Number(careerYear.value);
-    const label =
-      value === 4 ? "4年目以上" : `${value}年目`;
-    careerYearLabel.textContent = label;
-  });
 
   setupChipGroup("bonusTypeGroup");
-  setupChipGroup("bonusAmountGroup");
   setupChipGroup("companySizeGroup");
   setupChipGroup("anxietyTypeGroup");
   setupChipGroup("paymentMethodGroup");
@@ -61,11 +52,13 @@ function setupOnboarding() {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
 
+    const bonusAmountInput = Number($("bonusAmount").value || 0);
+
     const user = {
       careerYear: Number(careerYear.value),
       salary: Number($("salary").value || 0),
       bonusType: getSelectedValue("bonusTypeGroup"),
-      bonusAmount: normalizeNumber(getSelectedValue("bonusAmountGroup")),
+      bonusAmount: Number.isFinite(bonusAmountInput) ? bonusAmountInput : 0,
       companySize: getSelectedValue("companySizeGroup"),
       industry: $("industry").value,
       companyName: $("companyName").value.trim(),
@@ -82,8 +75,7 @@ function setupOnboarding() {
   if (state.user) {
     overlay.classList.remove("visible");
     // set UI controls from stored user for consistency
-    careerYear.value = state.user.careerYear ?? 1;
-    careerYear.dispatchEvent(new Event("input"));
+    careerYear.value = String(state.user.careerYear ?? 1);
   }
 }
 
