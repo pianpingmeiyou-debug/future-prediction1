@@ -206,6 +206,14 @@
             <p class="page-caption">この月の予定・天引きをまとめて確認</p>
           </header>
 
+          <div id="calendarTopSummary" class="month-summary-card">
+            <div class="month-summary-title">今月の支払い（目安）</div>
+            <div id="calendarTopTotalYen" class="month-summary-amount">-- 円</div>
+            <div id="calendarTopLoanYen" class="month-summary-sub">
+              ローン・分割：-- 円/月
+            </div>
+          </div>
+
           <div class="card">
             <div class="calendar-header">
               <button id="prevMonth" class="ghost-button">＜</button>
@@ -217,7 +225,12 @@
                   今月の予定・天引きの合計を表示します。
                 </div>
               </div>
-              <button id="nextMonth" class="ghost-button">＞</button>
+              <div class="calendar-actions">
+                <button id="openAddOverlay" class="ghost-button ghost-button--plus">
+                  ＋追加
+                </button>
+                <button id="nextMonth" class="ghost-button">＞</button>
+              </div>
             </div>
 
             <div class="calendar-legend">
@@ -234,11 +247,17 @@
               <div id="calendarDays" class="calendar-days"></div>
             </div>
           </div>
+        </section>
 
-          <div class="card">
-            <div class="add-header">
-              <h2>＋追加</h2>
-              <p class="page-caption">かんたん入力でイベントを追加</p>
+        <!-- Add overlay (Calendar) -->
+        <div id="add-overlay" class="overlay">
+          <div class="overlay-card">
+            <div class="overlay-top">
+              <div>
+                <h2 class="overlay-title">＋追加</h2>
+                <p class="overlay-caption">かんたん入力でイベントを追加</p>
+              </div>
+              <button id="closeAddOverlay" class="ghost-button">閉じる</button>
             </div>
 
             <div class="toggle-pills">
@@ -316,7 +335,7 @@
                 <div class="chip-row" id="installmentGroup"></div>
               </div>
 
-              <button id="addOneTimeEvent" class="primary-button small">
+              <button id="addOneTimeEvent" class="primary-button">
                 カレンダーに追加
               </button>
             </div>
@@ -357,12 +376,12 @@
                 </div>
               </div>
 
-              <button id="addRecurringEvent" class="primary-button small">
+              <button id="addRecurringEvent" class="primary-button">
                 登録してカレンダーに反映
               </button>
             </div>
           </div>
-        </section>
+        </div>
 
         <!-- Income forecast -->
         <section id="tab-income" class="tab-page">
@@ -392,7 +411,7 @@
                   <span class="dot dot-bonus"></span> ボーナス
                 </span>
               </div>
-              <div id="incomeGraph" class="graph-scroll"></div>
+              <canvas id="incomeCanvas" class="line-canvas" width="900" height="260"></canvas>
               <div id="incomeTooltip" class="graph-tooltip hidden"></div>
             </div>
           </div>
