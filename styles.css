@@ -35,7 +35,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  max-width: 520px;
+  max-width: 720px;
   margin: 0 auto;
   position: relative;
   padding-bottom: 64px; /* tab bar space */
@@ -300,23 +300,23 @@ label {
 /* Pages */
 
 .page-header {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .page-header h1 {
-  font-size: 20px;
+  font-size: 19px;
 }
 
 .page-caption {
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 3px;
+  font-size: 11px;
   color: var(--color-text-soft);
 }
 
 .card-grid {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .card {
@@ -395,8 +395,8 @@ label {
 
 .ai-comment {
   margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.6;
   color: var(--color-text-soft);
 }
 
@@ -692,7 +692,7 @@ label {
   transform: translateX(-50%);
   bottom: 10px;
   width: 100%;
-  max-width: 520px;
+  max-width: 720px;
   padding: 4px 10px;
   z-index: 10;
 }
@@ -789,22 +789,6 @@ label {
 @media (min-width: 640px) {
   main {
     padding-top: 22px;
-  }
-
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .card-grid .card:nth-child(1) {
-    grid-column: span 2;
-  }
-
-  .card-grid .card:nth-child(2),
-  .card-grid .card:nth-child(3),
-  .card-grid .card:nth-child(4),
-  .card-grid .card:nth-child(5) {
-    grid-column: span 1;
   }
 }
 
