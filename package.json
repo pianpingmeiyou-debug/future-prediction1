@@ -1,0 +1,17 @@
+{
+  "name": "futureflow-mini",
+  "version": "1.0.0",
+  "description": "FutureFlow（未来手取りナビ）仕様書に基づくシンプルなフロントエンド実装",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "futureflow",
+    "finance",
+    "education"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}
+
