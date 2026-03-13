@@ -1,648 +1,798 @@
-// FutureFlow - Soft UI App Logic
-
-// User State (Including new params)
-let userState = {
-    expYear: 1, // 1, 2, 3+
-    income: 0, // gross annual
-    hasBonus: false,
-    bonusAmount: 0, // per bonus, ~2 times a year
-    companySize: 'other', // large, medium, startup, public, other
-    industry: 'other',
-    companyName: '',
-    anxietyProfile: 6, // 1~6
-    expenses: [], // { id, name, date (YYYY-MM-DD), cost, isTax, desc, isAI }
-    
-    // Calculated values for AI
-    monthlyGross: 0,
-    yearlyBonusSum: 0
+// Simple state
+const state = {
+  user: null,
+  events: [], // {id, title, type, date, amount, paymentMethod, installment}
 };
 
-let editingExpenseId = null; // Track if we are editing an existing item
+const STORAGE_KEY = "futureflow_state_v1";
 
-// UI State
-let currentCalMonthStr = "";
-let chartInstances = {};
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    // Ensure Step 1 is active and others are hidden
-    document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
-    document.getElementById('step-1').classList.add('active');
-
-    // Show onboarding
-    document.getElementById('onboarding-modal').classList.remove('hidden');
-    
-    const today = new Date();
-    currentCalMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-});
-
-// --- Onboarding Logic ---
-function toggleBonusInput() {
-    const v = document.getElementById('bonus-timing').value;
-    const group = document.getElementById('bonus-amount-group');
-    if(v === 'summer-winter') {
-        group.classList.remove('hidden');
-    } else {
-        group.classList.add('hidden');
-    }
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed.user) state.user = parsed.user;
+    if (Array.isArray(parsed.events)) state.events = parsed.events;
+  } catch (e) {
+    console.warn("Failed to load state", e);
+  }
 }
 
-function nextStep(stepNumber) {
-    if(stepNumber === 2) {
-        const inc = document.getElementById('income').value;
-        if(!inc) return alert("現在の額面年収を入力してください");
-        
-        userState.income = parseInt(inc) * 10000;
-        userState.expYear = parseInt(document.getElementById('exp-year').value);
-        userState.companySize = document.getElementById('company-size').value;
-        userState.industry = document.getElementById('industry').value;
-        userState.companyName = document.getElementById('company-name').value;
-        
-        const bTime = document.getElementById('bonus-timing').value;
-        let bAmt = document.getElementById('bonus-amount').value;
-        
-        if (bTime === 'summer-winter') {
-            userState.hasBonus = true;
-            userState.bonusAmount = bAmt ? parseInt(bAmt) * 10000 : 0;
-            userState.yearlyBonusSum = userState.bonusAmount * 2;
-        } else if (bTime === 'unknown') {
-            userState.hasBonus = true;
-            // AI Mock: Guess bonus is 15% of annual income over 2 times
-            userState.bonusAmount = Math.floor(userState.income * 0.15 / 2);
-            userState.yearlyBonusSum = userState.bonusAmount * 2;
-        } else {
-            userState.hasBonus = false;
-            userState.bonusAmount = 0;
-            userState.yearlyBonusSum = 0;
-        }
+function saveState() {
+  try {
+    const payload = {
+      user: state.user,
+      events: state.events,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn("Failed to save state", e);
+  }
+}
 
-        userState.monthlyGross = Math.floor((userState.income - userState.yearlyBonusSum) / 12);
-        if(userState.monthlyGross < 0) userState.monthlyGross = Math.floor(userState.income / 12);
+function $(id) {
+  return document.getElementById(id);
+}
+
+// ---------- Onboarding ----------
+
+function setupOnboarding() {
+  const overlay = $("onboarding-overlay");
+  const careerYear = $("careerYear");
+  const careerYearLabel = $("careerYearLabel");
+
+  careerYear.addEventListener("input", () => {
+    const value = Number(careerYear.value);
+    const label =
+      value === 4 ? "4年目以上" : `${value}年目`;
+    careerYearLabel.textContent = label;
+  });
+
+  setupChipGroup("bonusTypeGroup");
+  setupChipGroup("bonusAmountGroup");
+  setupChipGroup("companySizeGroup");
+  setupChipGroup("anxietyTypeGroup");
+  setupChipGroup("paymentMethodGroup");
+
+  // default installment options for one-time card
+  updateInstallmentOptions("card");
+
+  const form = $("onboarding-form");
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const user = {
+      careerYear: Number(careerYear.value),
+      salary: Number($("salary").value || 0),
+      bonusType: getSelectedValue("bonusTypeGroup"),
+      bonusAmount: normalizeNumber(getSelectedValue("bonusAmountGroup")),
+      companySize: getSelectedValue("companySizeGroup"),
+      industry: $("industry").value,
+      companyName: $("companyName").value.trim(),
+      anxietyType: Number(getSelectedValue("anxietyTypeGroup") || 6),
+    };
+
+    state.user = user;
+    saveState();
+    overlay.classList.remove("visible");
+    refreshAllViews();
+  });
+
+  // Auto close onboarding if user data already exists
+  if (state.user) {
+    overlay.classList.remove("visible");
+    // set UI controls from stored user for consistency
+    careerYear.value = state.user.careerYear ?? 1;
+    careerYear.dispatchEvent(new Event("input"));
+  }
+}
+
+function setupChipGroup(groupId) {
+  const container = $(groupId);
+  if (!container) return;
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-value]");
+    if (!btn) return;
+    Array.from(
+      container.querySelectorAll("button[data-value]")
+    ).forEach((b) => b.classList.remove("selected"));
+    btn.classList.add("selected");
+
+    if (groupId === "paymentMethodGroup") {
+      updateInstallmentOptions(btn.dataset.value);
     }
+  });
+}
 
-    // Class Management
-    document.querySelectorAll('.step').forEach(el => {
-        el.classList.remove('active');
-        el.classList.add('hidden'); // Ensure old step is fully hidden
+function getSelectedValue(groupId) {
+  const container = $(groupId);
+  if (!container) return null;
+  const selected = container.querySelector("button.selected");
+  return selected ? selected.dataset.value : null;
+}
+
+function normalizeNumber(value) {
+  if (value === "unknown") return 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// ---------- Tabs ----------
+
+function setupTabs() {
+  const buttons = document.querySelectorAll(".tab-button");
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      buttons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const target = btn.dataset.target;
+      document
+        .querySelectorAll(".tab-page")
+        .forEach((p) => p.classList.remove("active"));
+      $("tab-" + target).classList.add("active");
     });
-    
-    const nextItem = document.getElementById(`step-${stepNumber}`);
-    nextItem.classList.remove('hidden'); // Ensure hidden is removed
-    nextItem.classList.add('active');
+  });
 }
 
-function selectAnxietyProfile(profileId) {
-    userState.anxietyProfile = profileId;
-    finishOnboarding();
-}
+// ---------- Calendar ----------
 
-function finishOnboarding() {
-    showLoadingAI(() => {
-        document.getElementById('onboarding-modal').classList.add('hidden');
-        document.getElementById('app-container').classList.remove('hidden');
-        
-        runAILogic();
-        updateAllUI();
-        switchTab('home'); // Default tab
-    });
-}
+let currentMonth = new Date();
 
-function showLoadingAI(callback) {
-    const loader = document.getElementById('ai-loading');
-    loader.classList.remove('hidden');
-    setTimeout(() => {
-        loader.classList.add('hidden');
-        callback();
-    }, 1500); // 1.5s fake AI logic computation
-}
-
-// --- Navigation ---
-function switchTab(tabId) {
-    // Hide all tabs
-    document.querySelectorAll('.tab-content').forEach(el => {
-        el.classList.remove('active');
-        el.classList.add('hidden');
-    });
-    
-    // Show selected tab
-    const targetTab = document.getElementById(`tab-${tabId}`);
-    if (targetTab) {
-        targetTab.classList.remove('hidden');
-        targetTab.classList.add('active');
-    }
-    
-    // Update Nav buttons
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    const btn = document.querySelector(`button[onclick="switchTab('${tabId}')"]`);
-    if (btn) btn.classList.add('active');
-
-    // Tab specific logic execution
-    if(tabId === 'prediction') {
-        renderChart();
-        // Ensure chart resizes after container is visible
-        if (chartInstances.main) {
-            setTimeout(() => {
-                chartInstances.main.resize();
-            }, 50);
-        }
-    }
-    if(tabId === 'calendar') renderCalendar();
-}
-
-function openSettings() {
-    document.getElementById('settings-modal').classList.remove('hidden');
-}
-
-function openOnboardingFromSettings() {
-    closeModal('settings-modal');
-    document.getElementById('app-container').classList.add('hidden');
-    document.getElementById('onboarding-modal').classList.remove('hidden');
-    // Clear existing AI events to allow re-generation
-    userState.expenses = userState.expenses.filter(e => !e.isAI);
-    nextStep(1);
-}
-
-// --- AI Logic (Mock) ---
-function runAILogic() {
-    // 1. Generate 2nd Year Resident Tax Alarms
-    generateAIResidentTaxEvents();
-    // 2. Generate Company Analysis Alert
-    generateCompanyAnalysis();
-}
-
-function generateMonthExpenseAnalysis() {
-    const titleObj = document.getElementById('ai-monthly-title');
-    const textObj = document.getElementById('ai-monthly-text');
-    
-    // Calculate current month's total expenses
-    const today = new Date();
-    const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    
-    let monthTotal = 0;
-    let hasBigExpense = false;
-    
-    userState.expenses.forEach(e => {
-        if(e.date.startsWith(currentMonthStr)) {
-            monthTotal += e.cost;
-            if(e.cost >= 10) hasBigExpense = true;
-        }
-    });
-
-    if (monthTotal === 0) {
-        titleObj.innerText = "出費予定なし";
-        textObj.innerText = "今月の予定された出費はまだありません。余裕があるうちに貯蓄に回すのも良いでしょう。";
-    } else if (hasBigExpense) {
-        titleObj.innerText = `今月は出費多め（計${monthTotal}万円）`;
-        textObj.innerText = "今月は大きな出費が予定されています。ボーナスや貯金など、引き落とし口座の残高を事前に確認しておきましょう。";
-    } else {
-        titleObj.innerText = `今月は安定（計${monthTotal}万円）`;
-        textObj.innerText = `今月の出費予定は計${monthTotal}万円です。毎月の手取り（約${userState.monthlyGross}万円）から無理なく支払える水準です。`;
-    }
-}
-
-function generateCompanyAnalysis() {
-    const titleObj = document.getElementById('ai-company-title');
-    const textObj = document.getElementById('ai-company-text');
-    
-    let compNameStr = userState.companyName ? `「${userState.companyName}」様での勤務、` : "";
-    
-    let sizeDetails = "";
-    if (userState.companySize === 'large') sizeDetails = "大企業は福利厚生が手厚く、住宅手当などが期待できるため、額面以上の可処分所得が残る可能性があります。";
-    else if (userState.companySize === 'medium') sizeDetails = "中小企業は能力次第で昇給ペースが早い場合があり、柔軟な働き方ができることが多いです。";
-    else if (userState.companySize === 'startup') sizeDetails = "ベンチャーはストックオプションや成果報酬など、ベース年収以外のアップサイドに期待できます。";
-    else if (userState.companySize === 'public') sizeDetails = "公務員は非常に安定した昇給曲線を描きやすく、長期的なライフプラン（住宅ローン等）が最も立てやすい属性です。";
-    else sizeDetails = "多様な働き方が増えている現在、自身のスキルアップがダイレクトに年収維持に繋がります。";
-
-    let indDetails = "";
-    if (userState.industry === 'it') indDetails = "IT・エンジニア職などは独立や転職による年収ジャンプアップが起きやすい業界です。";
-    else if (userState.industry === 'finance' || userState.industry === 'realestate' || userState.industry === 'medical') indDetails = "専門性が高く、平均的なベース年収は高めに推移し、ボーナス比率も大きい傾向があります。";
-    else if (userState.industry === 'auto' || userState.industry === 'electronics' || userState.industry === 'energy') indDetails = "大手製造業やインフラ系は安定したボーナス支給が多く、業績連動でまとまった収入が入りやすい傾向があります。";
-    else indDetails = "安定したパフォーマンスを出し続けることで、着実なキャリア形成が見込めます。";
-
-    titleObj.innerText = `${compNameStr}今後の収入トレンド分析`;
-    textObj.innerText = `${sizeDetails} \n${indDetails}`;
-}
-
-function calcTaxes(monthIndex, isBonusMonth) {
-    let gross = isBonusMonth ? userState.bonusAmount : userState.monthlyGross;
-    let health = Math.floor(gross * 0.05); 
-    let pension = Math.floor(gross * 0.0915); 
-    let emp = Math.floor(gross * 0.006); 
-    let taxable = gross - health - pension - emp;
-    if(taxable < 0) taxable = 0;
-    let incomeTax = Math.floor(taxable * 0.05); 
-    let resident = 0;
-    if (!isBonusMonth) {
-        let monthsToYear2June = 0;
-        if(userState.expYear === 1) monthsToYear2June = 8; 
-        else if(userState.expYear === 2) monthsToYear2June = 0; 
-        else monthsToYear2June = -12; 
-        if (monthIndex >= monthsToYear2June) {
-            resident = Math.floor((userState.income * 0.1) / 12);
-        }
-    }
-    let net = gross - incomeTax - health - pension - emp - resident;
-    return { gross, incomeTax, health, pension, employment: emp, resident, net };
-}
-
-function generateAIResidentTaxEvents() {
-    const today = new Date();
-    const aTitle = document.getElementById('ai-alert-title');
-    const aText = document.getElementById('ai-alert-text');
-    let resTaxMonthly = Math.floor((userState.income * 0.1) / 12 / 10000); 
-    
-    if (userState.expYear === 1) {
-        let nextYear = today.getFullYear() + 1;
-        aTitle.innerText = "2年目の壁（来年6月〜）";
-        aText.innerText = `${nextYear}年6月から本格的に「住民税」が引かれ始めます。月額 約${resTaxMonthly}万円 手取りが減る予測ですので、今のうちに貯蓄癖をつけましょう！`;
-        userState.expenses.push({
-            id: 'ai-res-' + Date.now(),
-            name: '住民税の天引き開始',
-            date: `${nextYear}-06`,
-            cost: resTaxMonthly,
-            isTax: true,
-            isAI: true,
-            desc: `前年度の収入に基づく税金です（以降毎月発生）`
-        });
-    } else if (userState.expYear === 2) {
-        aTitle.innerText = "2年目の住民税引去り中";
-        aText.innerText = `現在、去年の収入に基づく住民税が引かれています（月額約${resTaxMonthly}万円）。手取りが減って辛い時期ですが、ここが踏ん張りどころです。`;
-    } else {
-        aTitle.innerText = "安定期（住民税適応済）";
-        aText.innerText = `すでに住民税は安定して引かれています。今後の大幅な手取り減は少ない見込みです。将来の大きな出費に備えましょう。`;
-    }
-}
-
-function handleAIEventInjection(eventName, dateStr) {
-    if (eventName.includes('車')) {
-        let [y, m] = dateStr.split('-');
-        let nextYear = parseInt(y) + 1;
-        userState.expenses.push({
-            id: 'ai-car-tax-' + Date.now(),
-            name: '自動車税',
-            date: `${nextYear}-05-01`, 
-            cost: 3, 
-            isTax: true,
-            isAI: true,
-            desc: `<i class="fas fa-robot"></i> AI追加: 車を所有すると毎年5月に税金がかかります`
-        });
-        let shakenYear = parseInt(y) + 3; 
-        userState.expenses.push({
-            id: 'ai-car-shaken-' + Date.now(),
-            name: '車検',
-            date: `${shakenYear}-${m}-01`,
-            cost: 10,
-            isTax: true, 
-            isAI: true,
-            desc: `<i class="fas fa-robot"></i> AI追加: 初回（3年後）の車検費用見積もり`
-        });
-        alert("AI: 車の購入を検知しました！\n今後の「自動車税(毎年5月)」と「車検(3年後)」を自動でカレンダーに書き込みました。");
-    }
-}
-
-function updateAllUI() {
-    document.getElementById('disp-income').innerText = (userState.income / 10000).toLocaleString();
-    generateMonthExpenseAnalysis();
-    let fwLimit = Math.floor(userState.income * 0.015);
-    if(fwLimit < 10000) fwLimit = 10000;
-    document.getElementById('furusato-amount').innerText = `${fwLimit.toLocaleString()} 円`;
-    updateAnxietyMeter();
-}
-
-// --- Calendar ---
-function changeCalendarMonth(offset) {
-    let [y, m] = currentCalMonthStr.split('-');
-    let date = new Date(y, parseInt(m) - 1 + offset, 1);
-    currentCalMonthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+function setupCalendar() {
+  $("prevMonth").addEventListener("click", () => {
+    currentMonth.setMonth(currentMonth.getMonth() - 1);
     renderCalendar();
+  });
+  $("nextMonth").addEventListener("click", () => {
+    currentMonth.setMonth(currentMonth.getMonth() + 1);
+    renderCalendar();
+  });
+
+  setupAddEventForms();
+  renderCalendar();
+}
+
+function setupAddEventForms() {
+  const oneTimeTab = $("oneTimeTab");
+  const recurringTab = $("recurringTab");
+  const oneTimeForm = $("oneTimeForm");
+  const recurringForm = $("recurringForm");
+
+  oneTimeTab.addEventListener("click", () => {
+    oneTimeTab.classList.add("pill-filled");
+    recurringTab.classList.remove("pill-filled");
+    oneTimeForm.classList.remove("hidden");
+    recurringForm.classList.add("hidden");
+  });
+
+  recurringTab.addEventListener("click", () => {
+    recurringTab.classList.add("pill-filled");
+    oneTimeTab.classList.remove("pill-filled");
+    recurringForm.classList.remove("hidden");
+    oneTimeForm.classList.add("hidden");
+  });
+
+  $("addOneTimeEvent").addEventListener("click", () => {
+    const title = $("oneTimeTitle").value.trim() || "一時的な出費";
+    const date = $("oneTimeDate").value;
+    const amount = Number($("oneTimeAmount").value || 0);
+    const paymentMethod = getSelectedValue("paymentMethodGroup") || "lump";
+    const installment = getSelectedValue("installmentGroup") || "";
+
+    if (!date || amount <= 0) {
+      alert("支払日と金額を入力してください。");
+      return;
+    }
+
+    addOneTimeEvent({
+      title,
+      date,
+      amount,
+      paymentMethod,
+      installment,
+    });
+
+    $("oneTimeTitle").value = "";
+    $("oneTimeDate").value = "";
+    $("oneTimeAmount").value = "";
+
+    renderCalendar();
+    refreshHomeAnalysis();
+  });
+
+  $("addRecurringEvent").addEventListener("click", () => {
+    const title = $("recurringTitle").value;
+    const day = Number($("recurringDay").value || 0);
+    const amount = Number($("recurringAmount").value || 0);
+
+    if (day < 1 || day > 28 || amount <= 0) {
+      alert("支払日（1〜28）と月額を入力してください。");
+      return;
+    }
+
+    addRecurringEvent({ title, day, amount });
+    $("recurringDay").value = "";
+    $("recurringAmount").value = "";
+
+    renderCalendar();
+    refreshHomeAnalysis();
+  });
+}
+
+function updateInstallmentOptions(method) {
+  const section = $("installmentSection");
+  const group = $("installmentGroup");
+  group.innerHTML = "";
+
+  let options = [];
+  if (method === "card") {
+    options = ["3回", "6回", "10回", "12回", "24回"];
+  } else if (method === "shopping") {
+    options = ["12回", "24回", "36回", "48回", "60回"];
+  } else if (method === "bank") {
+    options = ["1年", "2年", "3年", "5年", "7年", "10年"];
+  } else {
+    section.style.display = "none";
+  }
+
+  if (options.length) {
+    section.style.display = "block";
+    options.forEach((label, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip" + (idx === 0 ? " selected" : "");
+      btn.dataset.value = label;
+      btn.textContent = label;
+      group.appendChild(btn);
+    });
+  }
+
+  setupChipGroup("installmentGroup");
+}
+
+function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
+  const base = {
+    id: crypto.randomUUID(),
+    title,
+    type: "oneTime",
+    date,
+    amount,
+    paymentMethod,
+    installment,
+  };
+
+  state.events.push(base);
+
+  // AI自動生成 (単純ロジック)
+  if (title.includes("車") || title.includes("自動車")) {
+    const baseDate = new Date(date);
+    const year = baseDate.getFullYear();
+    const autoEvents = [
+      {
+        title: "自動車税",
+        offsetMonths: 1,
+        kind: "tax",
+        amount: Math.round(amount * 0.02),
+      },
+      {
+        title: "車検",
+        offsetMonths: 24,
+        kind: "event",
+        amount: Math.round(amount * 0.15),
+      },
+      {
+        title: "自動車保険",
+        offsetMonths: 1,
+        kind: "event",
+        amount: 8,
+      },
+    ];
+
+    autoEvents.forEach((ev) => {
+      const d = new Date(year, baseDate.getMonth() + ev.offsetMonths, 1);
+      state.events.push({
+        id: crypto.randomUUID(),
+        title: ev.title,
+        type: ev.kind === "tax" ? "tax" : "oneTime",
+        date: d.toISOString().slice(0, 10),
+        amount: ev.amount,
+        paymentMethod: "auto",
+        installment: "",
+        aiGenerated: true,
+      });
+    });
+  }
+
+  // 分割払い処理（ざっくり）
+  if (paymentMethod !== "lump") {
+    const times = parseInstallmentTimes(installment);
+    if (times > 1) {
+      const per = Math.round((amount * 10000) / times) / 10000;
+      const first = new Date(date);
+      for (let i = 1; i < times; i++) {
+        const d = new Date(
+          first.getFullYear(),
+          first.getMonth() + i,
+          first.getDate()
+        );
+        state.events.push({
+          id: crypto.randomUUID(),
+          title: `${title}（分割${i + 1}/${times}）`,
+          type: "installment",
+          date: d.toISOString().slice(0, 10),
+          amount: per,
+          paymentMethod,
+          installment,
+          aiGenerated: true,
+        });
+      }
+    }
+  }
+
+  saveState();
+}
+
+function parseInstallmentTimes(label) {
+  if (!label) return 1;
+  const m = label.match(/(\d+)/);
+  if (!m) return 1;
+  const v = Number(m[1]);
+  if (label.includes("年")) return v * 12;
+  return v;
+}
+
+function addRecurringEvent({ title, day, amount }) {
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, day);
+    state.events.push({
+      id: crypto.randomUUID(),
+      title,
+      type: "recurring",
+      date: d.toISOString().slice(0, 10),
+      amount,
+      paymentMethod: "monthly",
+      installment: "",
+    });
+  }
+  saveState();
 }
 
 function renderCalendar() {
-    let [yStr, mStr] = currentCalMonthStr.split('-');
-    document.getElementById('cal-month-display').innerText = `${yStr}年 ${parseInt(mStr)}月`;
-    const list = document.getElementById('expense-list');
-    list.innerHTML = '';
-    let monthEvents = userState.expenses.filter(e => e.date.substring(0, 7) === currentCalMonthStr);
-    if(monthEvents.length === 0) {
-        list.innerHTML = `<div class="text-center text-sub py-2">この月の予定や特別な天引きはありません 🌱</div>`;
-        return;
-    }
-    monthEvents.sort((a,b) => (b.cost - a.cost));
-    monthEvents.forEach(ex => {
-        let el = document.createElement('div');
-        el.className = `timeline-item ${ex.isTax ? 'tax-event' : ''}`;
-        let costStr = ex.cost > 0 ? `約 ${ex.cost}万円` : '';
-        let badge = ex.isAI ? `<span class="badge-ai">AI追加</span>` : '';
-        let dayStr = ex.date.length > 7 ? parseInt(ex.date.substring(8, 10)) + "日" : `${parseInt(mStr)}月`;
-        el.innerHTML = `
-            <div class="t-date">${dayStr}</div>
-            <div class="t-content">
-                <div class="t-title">${ex.name} ${badge}</div>
-                ${costStr ? `<div class="t-cost">${costStr}</div>` : ''}
-                ${ex.desc ? `<div class="t-desc">${ex.desc}</div>` : ''}
-            </div>
-            <div class="t-actions">
-                <button class="edit-btn" onclick="editExpense('${ex.id}')"><i class="fas fa-pen"></i></button>
-            </div>
-        `;
-        list.appendChild(el);
+  const monthLabel = $("calendarMonthLabel");
+  const daysContainer = $("calendarDays");
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+
+  monthLabel.textContent = `${year}年${month + 1}月`;
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const prevLast = new Date(year, month, 0);
+
+  const startWeekday = firstDay.getDay();
+  const totalDays = lastDay.getDate();
+
+  const cells = [];
+
+  for (let i = startWeekday - 1; i >= 0; i--) {
+    cells.push({
+      day: prevLast.getDate() - i,
+      monthOffset: -1,
     });
-    renderCalendarGrid();
-}
+  }
 
-function renderCalendarGrid() {
-    const container = document.getElementById('calendar-grid-container');
-    if (!container) return;
-    container.innerHTML = '';
-    const [y, m] = currentCalMonthStr.split('-').map(Number);
-    const firstDay = new Date(y, m - 1, 1).getDay();
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const today = new Date();
-    const isCurrentMonth = today.getFullYear() === y && today.getMonth() + 1 === m;
-    let monthDayEvents = {};
-    userState.expenses.forEach(e => {
-        if(e.date.startsWith(currentCalMonthStr) && e.date.length > 7) {
-            monthDayEvents[parseInt(e.date.substring(8, 10))] = true;
-        }
+  for (let d = 1; d <= totalDays; d++) {
+    cells.push({ day: d, monthOffset: 0 });
+  }
+
+  while (cells.length % 7 !== 0) {
+    const nextDay = cells.length - (startWeekday + totalDays) + 1;
+    cells.push({
+      day: nextDay,
+      monthOffset: 1,
     });
-    const prevMonthLastDay = new Date(y, m - 1, 0).getDate();
-    for (let i = firstDay - 1; i >= 0; i--) {
-        const d = document.createElement('div');
-        d.className = 'calendar-day other-month';
-        d.innerText = prevMonthLastDay - i;
-        container.appendChild(d);
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-        const dayDiv = document.createElement('div');
-        dayDiv.className = 'calendar-day';
-        dayDiv.innerText = d;
-        if (isCurrentMonth && d === today.getDate()) dayDiv.classList.add('today');
-        if (monthDayEvents[d]) {
-            dayDiv.classList.add('has-event');
-            const dot = document.createElement('div');
-            dot.className = 'day-dot';
-            dayDiv.appendChild(dot);
-        }
-        container.appendChild(dayDiv);
-    }
-    const currentCells = container.children.length;
-    for (let i = 1; i <= 42 - currentCells; i++) {
-        const d = document.createElement('div');
-        d.className = 'calendar-day other-month';
-        d.innerText = i;
-        container.appendChild(d);
-    }
-}
+  }
 
-function toggleInstallmentSelect() {
-    const method = document.getElementById('payment-method').value;
-    const group = document.getElementById('installment-group');
-    const select = document.getElementById('installment-count');
-    if (method !== 'once') {
-        group.classList.remove('hidden');
-        select.innerHTML = '';
-        if (method === 'bank-loan') {
-            select.innerHTML = `<option value="12">1年</option><option value="24">2年</option><option value="36">3年</option><option value="60">5年</option><option value="84">7年</option><option value="120">10年</option>`;
-        } else if (method === 'shopping-loan') {
-            select.innerHTML = `<option value="12">12回</option><option value="24">24回</option><option value="36">36回</option><option value="48">48回</option><option value="60">60回（5年）</option>`;
-        } else if (method === 'card-split') {
-            select.innerHTML = `<option value="3">3回</option><option value="6">6回</option><option value="10">10回</option><option value="12">12回</option><option value="24">24回</option>`;
-        }
-    } else group.classList.add('hidden');
-}
+  daysContainer.innerHTML = "";
 
-let activeExpenseMode = 'temp';
-function setExpenseMode(mode) {
-    activeExpenseMode = mode;
-    if (mode === 'temp') {
-        document.getElementById('btn-expense-temp').classList.add('active');
-        document.getElementById('btn-expense-monthly').classList.remove('active');
-        document.getElementById('expense-inputs-temp').classList.remove('hidden');
-        document.getElementById('expense-inputs-monthly').classList.add('hidden');
-        document.getElementById('expense-payment-section').classList.remove('hidden');
-        document.getElementById('expense-date-label').innerText = 'いつ？';
-        document.getElementById('expense-cost-label').innerText = 'およその金額（万円）';
-    } else {
-        document.getElementById('btn-expense-monthly').classList.add('active');
-        document.getElementById('btn-expense-temp').classList.remove('active');
-        document.getElementById('expense-inputs-monthly').classList.remove('hidden');
-        document.getElementById('expense-inputs-temp').classList.add('hidden');
-        document.getElementById('expense-payment-section').classList.add('hidden');
-        document.getElementById('expense-date-label').innerText = '支払日';
-        document.getElementById('expense-cost-label').innerText = '月額（万円）';
-    }
-}
+  const monthEvents = filterEventsByMonth(year, month);
+  const formatter = new Intl.NumberFormat("ja-JP");
 
-function addExpense() {
-    editingExpenseId = null;
-    document.getElementById('expense-modal').classList.remove('hidden');
-    document.getElementById('btn-expense-delete').classList.add('hidden');
-    document.getElementById('btn-expense-save').innerText = '追加する';
-    const today = new Date();
-    document.getElementById('expense-date').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    document.getElementById('expense-name-temp').value = "";
-    document.getElementById('expense-cost').value = "";
-    document.getElementById('payment-method').value = "once";
-    toggleInstallmentSelect();
-    setExpenseMode('temp');
-}
+  cells.forEach((cell) => {
+    const cellDate = new Date(year, month + cell.monthOffset, cell.day);
+    const dateStr = cellDate.toISOString().slice(0, 10);
+    const dayEvents = monthEvents.filter((ev) => ev.date === dateStr);
 
-function editExpense(id) {
-    editingExpenseId = id;
-    const ex = userState.expenses.find(e => e.id === id);
-    if (!ex) return;
-    
-    document.getElementById('expense-modal').classList.remove('hidden');
-    document.getElementById('btn-expense-delete').classList.remove('hidden');
-    document.getElementById('btn-expense-save').innerText = '更新する';
+    const el = document.createElement("div");
+    el.className =
+      "calendar-day" +
+      (cell.monthOffset !== 0 ? " calendar-day--muted" : "");
 
-    // Set tab based on whether it's recurring or not
-    if (id.includes('recur')) setExpenseMode('monthly');
-    else setExpenseMode('temp');
+    const num = document.createElement("div");
+    num.className = "calendar-day-number";
+    num.textContent = cell.day;
+    el.appendChild(num);
 
-    if (activeExpenseMode === 'temp') {
-        document.getElementById('expense-name-temp').value = ex.name;
-    } else {
-        document.getElementById('expense-name-monthly').value = ex.name;
-    }
+    const list = document.createElement("div");
+    list.className = "calendar-day-events";
 
-    let d = ex.date;
-    if (d.length === 7) d += "-01";
-    document.getElementById('expense-date').value = d;
-    document.getElementById('expense-cost').value = ex.cost;
-    document.getElementById('payment-method').value = "once";
-    toggleInstallmentSelect();
-}
-
-function saveExpense() {
-    let name = activeExpenseMode === 'temp' ? document.getElementById('expense-name-temp').value : document.getElementById('expense-name-monthly').value;
-    let date = document.getElementById('expense-date').value;
-    let cost = parseInt(document.getElementById('expense-cost').value || 0);
-    let method = activeExpenseMode === 'temp' ? document.getElementById('payment-method').value : 'once';
-    let installments = activeExpenseMode === 'temp' ? parseInt(document.getElementById('installment-count').value || 1) : 1;
-    if(!name || !date) return alert("イベント名と支払日は必須です");
-
-    if (editingExpenseId) {
-        let idx = userState.expenses.findIndex(e => e.id === editingExpenseId);
-        if (idx > -1) {
-            userState.expenses[idx].name = name;
-            userState.expenses[idx].date = date;
-            userState.expenses[idx].cost = cost;
-            userState.expenses[idx].desc = ""; 
-        }
-        editingExpenseId = null;
-    } else if (activeExpenseMode === 'monthly') {
-        let [y, m, d] = date.split('-').map(Number);
-        if(!d) d = 1;
-        for (let i = 0; i < 36; i++) {
-            let curM = m + i;
-            let curY = y + Math.floor((curM - 1) / 12);
-            let dispM = ((curM - 1) % 12) + 1;
-            userState.expenses.push({ id: `usr-recur-${Date.now()}-${i}`, name: name, date: `${curY}-${String(dispM).padStart(2, '0')}-${String(d).padStart(2, '0')}`, cost: cost, isTax: false, isAI: (i > 0), desc: `<i class="fas fa-redo"></i> 毎月の出費` });
-        }
-    } else if (method === 'once') {
-        userState.expenses.push({ id: 'usr-' + Date.now(), name: name, date: date, cost: cost, isTax: false, isAI: false });
-    } else {
-        let monthlyCost = Math.ceil(cost / installments);
-        let [y, m, d] = date.split('-').map(Number);
-        if(!d) d = 1;
-        for (let i = 0; i < installments; i++) {
-            let curM = m + i;
-            let curY = y + Math.floor((curM - 1) / 12);
-            let dispM = ((curM - 1) % 12) + 1;
-            let label = method === 'bank-loan' ? '銀行ローン' : method === 'shopping-loan' ? 'ショッピングローン' : 'カード分割';
-            userState.expenses.push({ id: `usr-split-${Date.now()}-${i}`, name: `${name} (${i + 1}/${installments}回払い)`, date: `${curY}-${String(dispM).padStart(2, '0')}-${String(d).padStart(2, '0')}`, cost: monthlyCost, isTax: false, isAI: true, desc: `<i class="fas fa-credit-card"></i> ${label}` });
-        }
-    }
-    closeModal('expense-modal');
-    if (activeExpenseMode === 'temp' && !editingExpenseId) handleAIEventInjection(name, date.substring(0, 7));
-    renderCalendar();
-    updateAllUI();
-}
-
-function deleteExpense() {
-    if (!editingExpenseId) return;
-    
-    let target = userState.expenses.find(e => e.id === editingExpenseId);
-    if (!target) return;
-
-    // Batch delete logic for split payments or recurring items
-    let parts = editingExpenseId.split('-');
-    // IDs are like: usr-split-TIMESTAMP-INDEX or usr-recur-TIMESTAMP-INDEX
-    if ((editingExpenseId.includes('recur') || editingExpenseId.includes('split')) && parts.length >= 4) {
-        // Find the "common" part of the ID (prefix + timestamp)
-        let prefix = parts[0] + '-' + parts[1] + '-' + parts[2];
-        let curIdx = parseInt(parts[3]);
-
-        // Remove all items with same prefix and INDEX >= curIdx
-        userState.expenses = userState.expenses.filter(e => {
-            if (e.id.startsWith(prefix)) {
-                let p = e.id.split('-');
-                if (parseInt(p[3]) >= curIdx) return false;
-            }
-            return true;
-        });
-    } else {
-        // Single delete
-        userState.expenses = userState.expenses.filter(e => e.id !== editingExpenseId);
-    }
-
-    closeModal('expense-modal');
-    renderCalendar();
-    updateAllUI();
-}
-
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-// --- Chart.js Prediction ---
-function renderChart() {
-    const ctx = document.getElementById('incomeChart').getContext('2d');
-    if (chartInstances.main) chartInstances.main.destroy();
-
-    let labels = [];
-    let netData = [];
-    let grossData = [];
-    let today = new Date();
-
-    for (let i = 0; i < 36; i++) {
-        let d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        labels.push(`${d.getFullYear()}/${d.getMonth() + 1}`);
-        let isBonus = (d.getMonth() + 1 === 6 || d.getMonth() + 1 === 12) && userState.hasBonus;
-        let tax = calcTaxes(i, isBonus);
-        let monthTotalExpense = 0;
-        let mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        userState.expenses.filter(e => e.date.startsWith(mStr)).forEach(e => monthTotalExpense += e.cost);
-        grossData.push(tax.gross / 10000);
-        netData.push((tax.net - monthTotalExpense * 10000) / 10000);
-    }
-
-    chartInstances.main = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                { label: '手取り(予定支出引下後)', data: netData, borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 2 },
-                { label: '額面月収', data: grossData, borderColor: '#94a3b8', borderDash: [5, 5], fill: false, tension: 0.1, pointRadius: 0 }
-            ]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: true, position: 'top' } },
-            scales: { y: { beginAtZero: false, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { callback: v => v + '万' } }, x: { grid: { display: false } } }
-        }
+    dayEvents.slice(0, 3).forEach((ev) => {
+      const p = document.createElement("div");
+      p.className =
+        "calendar-pill " +
+        (ev.type === "tax"
+          ? "tax"
+          : ev.type === "recurring"
+          ? "fixed"
+          : "event");
+      // マス内はシンプルにイベント名だけ表示（例：車購入、家賃など）
+      p.textContent = ev.title;
+      list.appendChild(p);
     });
-}
 
-function updateAnxietyMeter() {
-    const icon = document.getElementById('status-icon');
-    const title = document.getElementById('status-title');
-    const reason = document.getElementById('status-reason');
-    const tag = document.getElementById('status-tag');
-    let today = new Date();
-    let minNet = 999;
-    for (let i = 0; i < 36; i++) {
-        let d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        let isBonus = (d.getMonth() + 1 === 6 || d.getMonth() + 1 === 12) && userState.hasBonus;
-        let tax = calcTaxes(i, isBonus);
-        let monthTotalExpense = 0;
-        let mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        userState.expenses.filter(e => e.date.startsWith(mStr)).forEach(e => monthTotalExpense += e.cost);
-        let net = (tax.net - monthTotalExpense * 10000) / 10000;
-        if(net < minNet) minNet = net;
+    if (dayEvents.length > 3) {
+      const more = document.createElement("div");
+      more.className = "calendar-pill";
+      more.textContent = `+${dayEvents.length - 3} 件`;
+      list.appendChild(more);
     }
-    if (minNet < 0) { icon.innerText = '🔴'; title.innerText = '警告'; reason.innerText = '収支がマイナスになる月があります。支出の見直しが必要です。'; }
-    else if (minNet < 10) { icon.innerText = '🟡'; title.innerText = '注意'; reason.innerText = '余裕が少ない月があります。急な出費に備えましょう。'; }
-    else { icon.innerText = '🟢'; title.innerText = '安定'; reason.innerText = '順調な収支予測です。貯蓄や投資の検討も可能です。'; }
-    tag.innerText = `安心設定: ${userState.anxietyProfile === 6 ? '標準' : 'カスタム'}`;
+
+    el.appendChild(list);
+    daysContainer.appendChild(el);
+  });
+
+  const total = monthEvents.reduce((sum, ev) => sum + (ev.amount || 0), 0);
+  const totalYen = Math.round(total * 10000);
+  const hasInstallment = monthEvents.some(
+    (ev) => ev.type === "installment" || (ev.paymentMethod && ev.paymentMethod !== "lump" && ev.paymentMethod !== "monthly" && ev.paymentMethod !== "auto")
+  );
+
+  $("calendarSummary").textContent =
+    totalYen > 0
+      ? hasInstallment
+        ? `この月の予定・天引き 合計目安：${totalYen.toLocaleString(
+            "ja-JP"
+          )} 円（ローン・分割を含めた月々の支払い）`
+        : `この月の予定・天引き 合計目安：${totalYen.toLocaleString(
+            "ja-JP"
+          )} 円`
+      : "この月の大きな出費はまだ登録されていません。";
 }
 
-function startFurusatoNavi() {
-    document.getElementById('furusato-navi-area').classList.remove('hidden');
-    document.querySelectorAll('.furusato-step').forEach(el => { el.classList.remove('active'); el.classList.add('hidden'); });
-    document.getElementById('furusato-q1').classList.remove('hidden');
-    document.getElementById('furusato-q1').classList.add('active');
+function filterEventsByMonth(year, month) {
+  const ym = `${year}-${String(month + 1).padStart(2, "0")}`;
+  return state.events.filter((ev) => ev.date && ev.date.startsWith(ym));
 }
 
-function furusatoAnswer(step, ans) {
-    if (step === 1) {
-        if (ans === 'yes') showFurusatoResult("確定申告が必要", "副業や控除がある場合は、ワンストップ特例が使えません。確定申告で申請しましょう。");
-        else {
-            document.getElementById('furusato-q1').classList.remove('active');
-            document.getElementById('furusato-q1').classList.add('hidden');
-            document.getElementById('furusato-q2').classList.remove('hidden');
-            document.getElementById('furusato-q2').classList.add('active');
-        }
+// ---------- Home ----------
+
+function refreshHomeView() {
+  const user = state.user;
+  if (!user) return;
+
+  const salary = user.salary || 0;
+  const yearlySalary = salary;
+
+  let bonusTimes = 0;
+  if (user.bonusType === "summer" || user.bonusType === "winter") {
+    bonusTimes = 1;
+  } else if (user.bonusType === "both") {
+    bonusTimes = 2;
+  }
+
+  const bonusAmount = user.bonusAmount || 0;
+  const predicted =
+    yearlySalary + bonusTimes * (bonusAmount / 10); // ざっくり調整
+
+  $("predictedIncome").textContent =
+    predicted > 0 ? `${Math.round(predicted)} 万円` : "-- 万円";
+
+  // 2年目の壁
+  const alertMain = $("secondYearAlertMain");
+  const alertDetail = $("secondYearAlertDetail");
+  if (user.careerYear <= 1) {
+    alertMain.textContent = "来年6月から住民税がスタートしそうです。";
+    alertDetail.textContent = "手取り −18,000円/月 前後の変化が出ることが多いです。";
+  } else if (user.careerYear === 2) {
+    alertMain.textContent = "今がちょうど2年目の壁ゾーンです。";
+    alertDetail.textContent = "住民税で手取りが少し減る時期なので、出費を意識できると安心です。";
+  } else {
+    alertMain.textContent = "住民税はすでに毎月の手取りに反映されています。";
+    alertDetail.textContent = "大きな変化は小さいですが、年末調整の通知には目を通しておきましょう。";
+  }
+
+  // 不安メーター
+  const anxietyMeter = $("anxietyMeter");
+  const anxietyReason = $("anxietyReason");
+  anxietyMeter.innerHTML = "";
+
+  const badge = document.createElement("span");
+  let reason = "";
+  if (user.anxietyType === 1 || user.anxietyType === 3) {
+    badge.textContent = "🟢 安定";
+    badge.className = "badge badge-safe";
+    reason = "貯金や手取りに余裕を持ちたいタイプ。今のペースなら前向きに進めそうです。";
+  } else if (user.anxietyType === 2 || user.anxietyType === 5) {
+    badge.textContent = "🟡 注意";
+    badge.className = "badge badge-warning";
+    reason = "将来イベントや貯金減少が気になるタイプ。カレンダーで先に出費を見ておくと安心です。";
+  } else {
+    badge.textContent = "🔴 危険？";
+    badge.className = "badge badge-danger";
+    reason = "手取りの変化に敏感なタイプ。まずは大きな出費だけ登録して、全体像をつかみましょう。";
+  }
+  anxietyMeter.appendChild(badge);
+  anxietyReason.textContent = reason;
+
+  // AIキャリア分析
+  const list = $("careerAnalysisList");
+  list.innerHTML = "";
+  const points = buildCareerAnalysis(user);
+  points.forEach((p) => {
+    const li = document.createElement("li");
+    li.textContent = p;
+    list.appendChild(li);
+  });
+
+  refreshHomeAnalysis();
+}
+
+function buildCareerAnalysis(user) {
+  const result = [];
+  if (user.industry === "it") {
+    result.push("IT業界はスキル次第で昇給チャンスが多い傾向があります。");
+  } else if (user.industry === "finance") {
+    result.push("金融はボーナス比率が高く、景気の影響を受けやすい業界です。");
+  } else if (user.industry === "service") {
+    result.push("サービス業は残業やシフトで手取りが変わりやすい特徴があります。");
+  }
+
+  if (user.companySize === "large") {
+    result.push("大企業は昇給カーブはゆるやかですが、安定度は高めです。");
+  } else if (user.companySize === "sme" || user.companySize === "venture") {
+    result.push("中小・ベンチャーはボーナスや昇給が年によって大きく変わる可能性があります。");
+  } else if (user.companySize === "public") {
+    result.push("公務員は収入の変動が小さく、長期の見通しを立てやすいタイプです。");
+  }
+
+  if (!result.length) {
+    result.push("今の業界・企業での3年目までの手取り変化を先に知っておくと安心です。");
+  }
+
+  return result;
+}
+
+function refreshHomeAnalysis() {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(
+    now.getMonth() + 1
+  ).padStart(2, "0")}`;
+  const monthEvents = state.events.filter(
+    (ev) => ev.date && ev.date.startsWith(ym)
+  );
+  const total = monthEvents.reduce((sum, ev) => sum + (ev.amount || 0), 0);
+
+  const el = $("thisMonthAnalysis");
+  if (monthEvents.length === 0) {
+    el.textContent =
+      "今月の大きな出費は登録されていません。余裕のある月に先取り貯金ができるかもしれません。";
+  } else if (total < 10) {
+    el.textContent =
+      "今月は出費が少なめです。来月以降のイベントをカレンダーに追加して、余裕をキープしましょう。";
+  } else if (total < 30) {
+    el.textContent =
+      "今月はやや出費が多めです。2年目の壁やボーナス前後の変化も合わせてチェックしてみましょう。";
+  } else {
+    el.textContent =
+      "今月はかなり大きな出費があります。支払い方法や分割回数を見直すと安心度が上がるかもしれません。";
+  }
+}
+
+// ---------- Income forecast ----------
+
+function setupIncomeGraph() {
+  const buttons = document.querySelectorAll(
+    'section#tab-income .year-toggle .chip'
+  );
+  buttons.forEach((btn) =>
+    btn.addEventListener("click", () => {
+      buttons.forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      const offset = Number(btn.dataset.yearOffset || 0);
+      renderIncomeGraph(offset);
+    })
+  );
+  renderIncomeGraph(0);
+}
+
+function renderIncomeGraph(yearOffset) {
+  const container = $("incomeGraph");
+  const tooltip = $("incomeTooltip");
+  container.innerHTML = "";
+
+  const user = state.user;
+  if (!user) return;
+
+  const baseSalary = user.salary || 0;
+  const yearlyGrowth = user.industry === "it" ? 0.05 : 0.02;
+  const salaryThisYear = baseSalary * (1 + yearlyGrowth * yearOffset);
+
+  let bonusTimes = 0;
+  if (user.bonusType === "summer" || user.bonusType === "winter") {
+    bonusTimes = 1;
+  } else if (user.bonusType === "both") {
+    bonusTimes = 2;
+  }
+  const bonusPer = user.bonusAmount || (baseSalary / 4);
+  const bonusTotal = bonusTimes * bonusPer;
+
+  const months = Array.from({ length: 12 }, (_, i) => i);
+
+  const taxBaseIncome = salaryThisYear + bonusTotal / 10;
+  const taxRate = user.careerYear + yearOffset >= 2 ? 0.23 : 0.18;
+
+  const maxIncome = (salaryThisYear * (1 - taxRate)) / 12 + bonusPer * 0.8;
+
+  months.forEach((m) => {
+    const monthSalary = salaryThisYear / 12;
+    const isBonusMonth =
+      bonusTimes === 2
+        ? m === 5 || m === 11
+        : bonusTimes === 1 && (m === 5 || m === 11);
+    const bonus = isBonusMonth ? bonusPer * 0.8 : 0;
+
+    const taxIncome = monthSalary + bonus;
+    const tax = taxIncome * taxRate;
+    const takeHome = Math.max(taxIncome - tax, 0);
+
+    const monthEl = document.createElement("div");
+    monthEl.className = "graph-month";
+
+    const bars = document.createElement("div");
+    bars.className = "graph-bars";
+
+    const incomeBar = document.createElement("div");
+    incomeBar.className = "bar income";
+    incomeBar.style.height = `${(takeHome / maxIncome) * 100 || 5}%`;
+    bars.appendChild(incomeBar);
+
+    const salaryBar = document.createElement("div");
+    salaryBar.className = "bar salary";
+    salaryBar.style.height = `${(monthSalary / maxIncome) * 80 || 5}%`;
+    bars.appendChild(salaryBar);
+
+    const bonusBar = document.createElement("div");
+    bonusBar.className = "bar bonus";
+    bonusBar.style.height = `${(bonus / maxIncome) * 80 || 0}%`;
+    bars.appendChild(bonusBar);
+
+    const label = document.createElement("div");
+    label.className = "graph-month-label";
+    label.textContent = `${m + 1}月`;
+
+    monthEl.appendChild(bars);
+    monthEl.appendChild(label);
+    container.appendChild(monthEl);
+
+    monthEl.addEventListener("mousemove", (e) => {
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX - rect.left + 8;
+      const y = e.clientY - rect.top - 10;
+
+      tooltip.classList.remove("hidden");
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top = `${y}px`;
+
+      const taxBreakdown = buildTaxBreakdown(taxIncome, user, yearOffset);
+      tooltip.innerHTML = `<strong>${m + 1}月の目安</strong><br />
+        手取り 約${takeHome.toFixed(0)}万円<br />
+        ${taxBreakdown}`;
+    });
+
+    monthEl.addEventListener("mouseleave", () => {
+      tooltip.classList.add("hidden");
+    });
+  });
+
+  refreshStabilityText();
+}
+
+function buildTaxBreakdown(taxIncome, user, yearOffset) {
+  const base = Math.max(taxIncome, 0);
+  const incomeTax = Math.round(base * 0.12);
+  const residentTax =
+    user.careerYear + yearOffset >= 2 ? Math.round(base * 0.15) : 0;
+  const pension = Math.round(2.5);
+  return `所得税 約${incomeTax}千円 / 住民税 約${residentTax}千円 / 厚生年金 約${pension}万円`;
+}
+
+function refreshStabilityText() {
+  const user = state.user;
+  const el = $("stabilityText");
+  if (!user) return;
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(
+    now.getMonth() + 1
+  ).padStart(2, "0")}`;
+  const monthEvents = state.events.filter(
+    (ev) => ev.date && ev.date.startsWith(ym)
+  );
+  const totalOut = monthEvents.reduce(
+    (sum, ev) => sum + (ev.amount || 0),
+    0
+  );
+  const monthlyTakeHome = (user.salary || 0) / 12;
+
+  if (totalOut === 0) {
+    el.textContent =
+      "今月の大きな出費は登録されていません。余裕があるうちに将来のイベントも少しずつ登録しておきましょう。";
+  } else {
+    const ratio = totalOut / (monthlyTakeHome || 1);
+    if (ratio < 0.3) {
+      el.textContent =
+        "出費は手取りの3割未満。安定ゾーンです。貯金や自己投資にまわせる余白もありそうです。";
+    } else if (ratio < 0.6) {
+      el.textContent =
+        "出費は手取りの3〜6割ほど。もう少し増えても大丈夫ですが、2年目の壁タイミングには注意しましょう。";
     } else {
-        if (ans === 'yes') showFurusatoResult("ワンストップ特例がおすすめ", "5自治体以内であれば、書類を送るだけで簡単に申請が完了します。");
-        else showFurusatoResult("確定申告が必要", "6自治体以上の場合は、ワンストップ特例が使えません。確定申告を行いましょう。");
+      el.textContent =
+        "出費が手取りの多くを占めています。分割払いやタイミング調整で、ピークをならすと安心度が上がります。";
     }
+  }
 }
 
-function showFurusatoResult(title, desc) {
-    document.querySelectorAll('.furusato-step').forEach(el => { el.classList.remove('active'); el.classList.add('hidden'); });
-    const res = document.getElementById('furusato-result');
-    res.classList.remove('hidden');
-    res.classList.add('active');
-    document.getElementById('f-result-title').innerText = title;
-    document.getElementById('f-result-desc').innerText = desc;
+// ---------- Furusato ----------
+
+function refreshFurusatoView() {
+  const user = state.user;
+  if (!user) return;
+
+  const yearly = (user.salary || 0) * 10000;
+  const limit = Math.round(yearly * 0.08 / 1000) * 1000;
+
+  $("furusatoLimit").textContent =
+    limit > 0 ? `${limit.toLocaleString("ja-JP")} 円まで可能` : "-- 円まで可能";
+
+  const yes = $("sideJobYes");
+  const no = $("sideJobNo");
+
+  yes.addEventListener("click", () => {
+    yes.classList.add("selected");
+    no.classList.remove("selected");
+    $("furusatoResultMain").textContent = "確定申告がおすすめです。";
+    $("furusatoResultDetail").textContent =
+      "副業収入がある場合は、ふるさと納税も含めて一度まとめて確定申告するパターンが多いです。";
+  });
+
+  no.addEventListener("click", () => {
+    no.classList.add("selected");
+    yes.classList.remove("selected");
+    $("furusatoResultMain").textContent =
+      "ワンストップ申請 が使えそうです。";
+    $("furusatoResultDetail").textContent =
+      "会社員で副業がなければ、5つの自治体までなら確定申告なしでOKなことが多いです。";
+  });
 }
+
+// ---------- Boot ----------
+
+function refreshAllViews() {
+  refreshHomeView();
+  renderCalendar();
+  setupIncomeGraph();
+  refreshFurusatoView();
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  loadState();
+  setupTabs();
+  setupOnboarding();
+  setupCalendar();
+  setupIncomeGraph();
+  refreshHomeView();
+  refreshFurusatoView();
+});
+
