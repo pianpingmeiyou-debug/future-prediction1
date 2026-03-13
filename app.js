@@ -12,7 +12,18 @@ function loadState() {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (parsed.user) state.user = parsed.user;
-    if (Array.isArray(parsed.events)) state.events = parsed.events;
+    if (Array.isArray(parsed.events)) {
+      state.events = parsed.events.map((ev) => {
+        if (ev && ev.date) {
+          try {
+            return { ...ev, date: formatLocalDate(parseYMD(ev.date)) };
+          } catch {
+            // ignore invalid dates
+          }
+        }
+        return ev;
+      });
+    }
   } catch (e) {
     console.warn("Failed to load state", e);
   }
@@ -117,6 +128,20 @@ function normalizeNumber(value) {
   if (value === "unknown") return 0;
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function parseYMD(value) {
+  const parts = String(value || "").split("-").map((v) => Number(v));
+  const year = parts[0] || new Date().getFullYear();
+  const month = parts[1] ? parts[1] - 1 : 0;
+  const day = parts[2] || 1;
+  return new Date(year, month, day);
+}
+
+function formatLocalDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
 }
 
 // ---------- Tabs ----------
@@ -333,13 +358,18 @@ function updateInstallmentOptions(method) {
 }
 
 function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
+  // 入力日付は文字列(yyyy-mm-dd)なので、タイムゾーンのずれを防ぐために
+  // ローカル日付で正規化してから扱う。
+  const first = parseYMD(date);
+  const normalizedDate = formatLocalDate(first);
+
   // 一括払いはその月に全額、ローン/分割は「月々」に割ってカレンダーへ展開する
   if (paymentMethod === "lump") {
     state.events.push({
       id: crypto.randomUUID(),
       title,
       type: "oneTime",
-      date,
+      date: normalizedDate,
       amount,
       paymentMethod,
       installment: "",
@@ -347,7 +377,6 @@ function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
   } else {
     const times = parseInstallmentTimes(installment);
     const per = times > 0 ? amount / times : amount;
-    const first = new Date(date);
 
     for (let i = 0; i < times; i++) {
       const d = new Date(
@@ -357,9 +386,9 @@ function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
       );
       state.events.push({
         id: crypto.randomUUID(),
-        title: i === 0 ? `${title}（月々）` : `${title}（月々）`,
+        title: `${title}（月々）`,
         type: "installment",
-        date: d.toISOString().slice(0, 10),
+        date: formatLocalDate(d),
         amount: Math.round(per * 10000) / 10000,
         paymentMethod,
         installment,
@@ -371,7 +400,7 @@ function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
 
   // AI自動生成 (単純ロジック)
   if (title.includes("車") || title.includes("自動車")) {
-    const baseDate = new Date(date);
+    const baseDate = first;
     const year = baseDate.getFullYear();
     const autoEvents = [
       {
@@ -400,7 +429,7 @@ function addOneTimeEvent({ title, date, amount, paymentMethod, installment }) {
         id: crypto.randomUUID(),
         title: ev.title,
         type: ev.kind === "tax" ? "tax" : "oneTime",
-        date: d.toISOString().slice(0, 10),
+        date: formatLocalDate(d),
         amount: ev.amount,
         paymentMethod: "auto",
         installment: "",
@@ -429,7 +458,7 @@ function addRecurringEvent({ title, day, amount }) {
       id: crypto.randomUUID(),
       title,
       type: "recurring",
-      date: d.toISOString().slice(0, 10),
+      date: formatLocalDate(d),
       amount,
       paymentMethod: "monthly",
       installment: "",
@@ -482,7 +511,7 @@ function renderCalendar() {
 
   cells.forEach((cell) => {
     const cellDate = new Date(year, month + cell.monthOffset, cell.day);
-    const dateStr = cellDate.toISOString().slice(0, 10);
+    const dateStr = formatLocalDate(cellDate);
     const dayEvents = monthEvents.filter((ev) => ev.date === dateStr);
 
     const el = document.createElement("div");
@@ -791,6 +820,7 @@ function renderIncomeLine(yearOffset) {
   });
 
   const maxY = Math.max(
+    1,
     ...series.map((p) => Math.max(p.takeHome, p.salary + p.bonus))
   );
 
@@ -807,12 +837,20 @@ function renderIncomeLine(yearOffset) {
   ctx.clearRect(0, 0, w, h);
   ctx.lineWidth = 1;
   ctx.strokeStyle = "rgba(10, 35, 80, 0.08)";
+  ctx.fillStyle = "rgba(10, 35, 80, 0.55)";
+  ctx.font = "10px system-ui, -apple-system, Segoe UI, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+
   for (let i = 0; i <= 4; i++) {
     const y = pad.t + (plotH * i) / 4;
     ctx.beginPath();
     ctx.moveTo(pad.l, y);
     ctx.lineTo(pad.l + plotW, y);
     ctx.stroke();
+
+    const value = Math.round(maxY - (maxY * i) / 4);
+    ctx.fillText(`${value}万`, pad.l - 8, y);
   }
 
   // x-axis
