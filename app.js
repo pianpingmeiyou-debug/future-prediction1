@@ -829,7 +829,7 @@ function renderIncomeLine(yearOffset) {
 
   const w = cssWidth;
   const h = cssHeight;
-  const pad = { l: 16, r: 16, t: 16, b: 28 };
+  const pad = { l: 40, r: 16, t: 16, b: 28 };
   const plotW = w - pad.l - pad.r;
   const plotH = h - pad.t - pad.b;
 
