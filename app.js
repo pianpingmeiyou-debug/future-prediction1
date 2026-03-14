@@ -544,7 +544,7 @@ function renderCalendar() {
     if (dayEvents.length > 3) {
       const more = document.createElement("div");
       more.className = "calendar-pill";
-      more.textContent = `+${dayEvents.length - 3} 件`;
+      more.textContent = `+${dayEvents.length - 3} ���`;
       list.appendChild(more);
     }
 
@@ -664,42 +664,6 @@ function refreshHomeView() {
   anxietyMeter.appendChild(badge);
   anxietyReason.textContent = reason;
 
-  // AIキャリア分析
-  const list = $("careerAnalysisList");
-  if (list) {
-    list.innerHTML = "";
-    const points = buildCareerAnalysis(user);
-    points.forEach((p) => {
-      const li = document.createElement("li");
-      li.textContent = p;
-      list.appendChild(li);
-    });
-  }
-}
-
-function buildCareerAnalysis(user) {
-  const result = [];
-  if (user.industry === "it") {
-    result.push("IT業界はスキル次第で昇給チャンスが多い傾向があります。");
-  } else if (user.industry === "finance") {
-    result.push("金融はボーナス比率が高く、景気の影響を受けやすい業界です。");
-  } else if (user.industry === "service") {
-    result.push("サービス業は残業やシフトで手取りが変わりやすい特徴があります。");
-  }
-
-  if (user.companySize === "large") {
-    result.push("大企業は昇給カーブはゆるやかですが、安定度は高めです。");
-  } else if (user.companySize === "sme" || user.companySize === "venture") {
-    result.push("中小・ベンチャーはボーナスや昇給が年によって大きく変わる可能性があります。");
-  } else if (user.companySize === "public") {
-    result.push("公務員は収入の変動が小さく、長期の見通しを立てやすいタイプです。");
-  }
-
-  if (!result.length) {
-    result.push("今の業界・企業での3年目までの手取り変化を先に知っておくと安心です。");
-  }
-
-  return result;
 }
 
 function refreshHomeAnalysis() {
@@ -720,6 +684,13 @@ function setupIncomeGraph() {
       renderIncomeLine(offset);
     })
   );
+  
+  // Set initial default guide text
+  const guideText = $("monthlyGuideText");
+  if (guideText) {
+    guideText.innerHTML = '<p style="margin: 0; font-size: 13px; color: #666; font-style: italic;">グラフをホバーして月を選択すると、その月の詳細情報が表示されます</p>';
+  }
+  
   renderIncomeLine(0);
   window.addEventListener("resize", () => {
     const selected = document.querySelector(
@@ -936,6 +907,17 @@ function renderIncomeLine(yearOffset) {
     tooltip.innerHTML = `<strong>${p.month}月の目安</strong><br />
       手取り 約${p.takeHome.toFixed(0)}万円<br />
       ${taxBreakdown}`;
+    
+    // Update the monthly guide section below
+    const guideText = $("monthlyGuideText");
+    if (guideText) {
+      guideText.innerHTML = `<strong style="color: #0ea5e9; font-size: 14px; display: block; margin-bottom: 6px;">${p.month}月の目安</strong>
+        <div style="text-align: left; font-size: 12px; color: #334155; line-height: 1.6;">
+          <p style="margin: 4px 0;"><strong style="color: #0f172a;">手取り：</strong>約<span style="font-weight: 700; color: #0ea5e9; font-size: 13px;">${p.takeHome.toFixed(0)}万円</span></p>
+          <p style="margin: 4px 0;"><strong style="color: #0f172a;">給与：</strong>約${p.salary.toFixed(1)}万円</p>
+          ${p.bonus > 0 ? `<p style="margin: 4px 0;"><strong style="color: #0f172a;">ボーナス：</strong>約${p.bonus.toFixed(1)}万円</p>` : ''}
+        </div>`;
+    }
   };
 
   refreshStabilityText();
