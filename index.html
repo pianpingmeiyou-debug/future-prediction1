@@ -27,14 +27,14 @@
             </section>
 
             <section class="form-section">
-              <h2>年収（だいたいでOK）</h2>
+              <h2>月給（だいたいでOK）</h2>
               <div class="input-row">
                 <input
                   type="number"
                   id="salary"
                   min="0"
-                  step="10"
-                  placeholder="例）350"
+                  step="1"
+                  placeholder="例）25"
                 />
                 <span class="suffix">万円</span>
               </div>
@@ -153,69 +153,16 @@
 
       <!-- Main layout -->
       <main id="main-content">
-        <!-- Home -->
-        <section id="tab-home" class="tab-page active">
+        <!-- Calendar -->
+        <section id="tab-calendar" class="tab-page active">
           <header class="page-header home-header">
             <div>
-              <h1>🏠 ホーム</h1>
-              <p class="page-caption">あなたの今と未来のお金を見える化</p>
+              <h1>📆未来支出カレンダー</h1>
+              <p class="page-caption">この月の予定・天引きをまとめて確認</p>
             </div>
             <button id="openSettingsOverlay" class="ghost-button edit-settings-btn" title="設定の変更">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px; vertical-align:middle; position:relative; top:-1px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> 初期設定を再編集
             </button>
-          </header>
-
-          <div class="card-grid home-grid">
-            <div class="card glass-card premium-card">
-              <div class="card-icon">💰</div>
-              <h2>予想年収</h2>
-              <p class="big-number premium-number" id="predictedIncome">-- 万円</p>
-              <p class="sub-text" id="predictedIncomeNote">
-                最新の入力情報に基づいたAI予測
-              </p>
-            </div>
-
-            <div class="card glass-card warning-card">
-              <div class="card-icon">⚠️</div>
-              <h2>2年目の壁アラート</h2>
-              <p class="alert-main" id="secondYearAlertMain">来年6月から住民税がスタート</p>
-              <p class="alert-detail" id="secondYearAlertDetail">手取り −18,000円/月 くらいの目安です。</p>
-            </div>
-
-            <div class="home-split">
-              <div class="card glass-card half-card">
-                <div class="card-icon">🧭</div>
-                <h2>不安メーター</h2>
-                <div id="anxietyMeter" class="anxiety-meter">
-                  <span class="badge badge-safe">🟢 安定</span>
-                </div>
-                <p id="anxietyReason" class="sub-text compact-sub">
-                  安心基準に合わせた状態
-                </p>
-              </div>
-
-              <div class="card glass-card half-card">
-                <div class="card-icon">🧠</div>
-                <h2>今月の出費分析</h2>
-                <p id="thisMonthAnalysis" class="ai-comment compact-sub">
-                  カレンダーからバランスを分析
-                </p>
-              </div>
-            </div>
-
-            <div class="card glass-card">
-              <div class="card-icon">✨</div>
-              <h2>AIキャリア分析</h2>
-              <ul id="careerAnalysisList" class="bullet-list premium-list"></ul>
-            </div>
-          </div>
-        </section>
-
-        <!-- Calendar -->
-        <section id="tab-calendar" class="tab-page">
-          <header class="page-header">
-            <h1>未来支出カレンダー</h1>
-            <p class="page-caption">この月の予定・天引きをまとめて確認</p>
           </header>
 
           <div id="calendarTopSummary" class="month-summary-card">
@@ -262,6 +209,17 @@
               </div>
               <div id="calendarDays" class="calendar-days"></div>
             </div>
+          </div>
+          
+          <div class="card glass-card" style="margin-top: 16px; border: 2px solid #a8c7fa; background: #ebf2fa;">
+            <div class="card-icon" style="font-size: 28px;">🧭</div>
+            <h2 style="font-size: 16px; color: #0d47a1;">不安メーター</h2>
+            <div id="anxietyMeter" class="anxiety-meter" style="padding: 10px; border-radius: 12px; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.05); text-align: center; margin-bottom: 8px;">
+              <span class="badge badge-safe" style="font-size: 18px; padding: 6px 16px;">🟢 安定</span>
+            </div>
+            <p id="anxietyReason" class="sub-text" style="font-size: 14px; color: #1565c0; font-weight: 600; text-align: center;">
+              安心基準に合わせた状態
+            </p>
           </div>
         </section>
 
@@ -445,6 +403,15 @@
             <p class="page-caption">シンプルなグラフで3年分の手取りイメージ</p>
           </header>
 
+          <div class="card glass-card premium-card" style="margin-bottom: 16px;">
+            <div class="card-icon">💰</div>
+            <h2>予想年収</h2>
+            <p class="big-number premium-number" id="predictedIncome">-- 万円</p>
+            <p class="sub-text" id="predictedIncomeNote">
+              最新の入力情報に基づいたAI予測
+            </p>
+          </div>
+
           <div class="card">
             <div class="year-toggle">
               <button class="chip small selected" data-year-offset="0">
@@ -471,29 +438,38 @@
             </div>
           </div>
 
-          <div class="card">
-            <h2>ざっくり税金辞典</h2>
-            <ul class="bullet-list compact">
-              <li>
-                <strong>所得税</strong>：国に払う税金。給料から自動で引かれる。
-              </li>
-              <li>
-                <strong>住民税</strong>：前年収入の税金。2年目から増える。
-              </li>
-              <li>
-                <strong>厚生年金</strong>：将来の年金。会社が半分負担。
-              </li>
-              <li>
-                <strong>健康保険</strong>：医療費を3割にする保険。
-              </li>
-            </ul>
+          <div class="card dictionary-card glass-card" style="margin-bottom: 16px; border-left: 6px solid #8b5cf6;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <div class="card-icon" style="font-size: 32px; margin: 0;">📖</div>
+              <h2 style="font-size: 18px; color: #4c1d95; margin: 0;">ざっくり<span style="color: #6d28d9;">税金辞典</span></h2>
+            </div>
+            <p style="font-size: 13px; color: #5b21b6; margin-bottom: 12px;">お給料から引かれるお金の正体、教えるよ！</p>
+            
+            <div class="dictionary-item" style="background: #fdfaef; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+              <h3 style="color: #b45309; font-size: 15px; border-bottom: 2px dashed #fcd34d; padding-bottom: 4px; margin-bottom: 6px;">所得税</h3>
+              <p style="font-size: 13px; color: #78350f; line-height: 1.5;">国に支払う税金で、収入（給料・副業など）に応じて金額が決まります。<br>会社員の場合は、毎月の給料からあらかじめ差し引かれて国に納められます。</p>
+            </div>
+            
+            <div class="dictionary-item" style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+              <h3 style="color: #15803d; font-size: 15px; border-bottom: 2px dashed #86efac; padding-bottom: 4px; margin-bottom: 6px;">住民税</h3>
+              <p style="font-size: 13px; color: #14532d; line-height: 1.5;">住んでいる都道府県や市区町村に支払う税金で、地域の行政サービスに使われます。<br>前年の収入をもとに金額が決まり、社会人2年目から支払いが始まることが多いです。</p>
+            </div>
+            
+            <div class="dictionary-item" style="background: #eff6ff; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+              <h3 style="color: #1d4ed8; font-size: 15px; border-bottom: 2px dashed #93c5fd; padding-bottom: 4px; margin-bottom: 6px;">厚生年金</h3>
+              <p style="font-size: 13px; color: #1e3a8a; line-height: 1.5;">会社員や公務員が加入する年金制度で、老後に年金を受け取るための仕組みです。<br>保険料は会社と本人が半分ずつ負担し、毎月の給料から差し引かれます。</p>
+            </div>
+
+            <div class="dictionary-item" style="background: #fef2f2; padding: 12px; border-radius: 8px;">
+              <h3 style="color: #b91c1c; font-size: 15px; border-bottom: 2px dashed #fca5a5; padding-bottom: 4px; margin-bottom: 6px;">健康保険</h3>
+              <p style="font-size: 13px; color: #7f1d1d; line-height: 1.5;">病院にかかったときの医療費を一部負担にするための公的な保険制度です。<br>加入していると、通常は医療費の自己負担が3割程度になります。</p>
+            </div>
           </div>
 
-          <div class="card">
-            <h2>安定度</h2>
-            <p id="stabilityText" class="ai-comment">
-              手取りと出費のバランスから、ざっくり安定度を表示します。
-            </p>
+          <div class="card glass-card">
+            <div class="card-icon">✨</div>
+            <h2>AIキャリア分析</h2>
+            <ul id="careerAnalysisList" class="bullet-list premium-list" style="margin-top: 8px; font-size: 14px; line-height: 1.7;"></ul>
           </div>
         </section>
 
@@ -504,17 +480,9 @@
             <p class="page-caption">上限額とやる・やらないのカンタン整理</p>
           </header>
 
-          <div class="card">
-            <h2>あなたの上限額（目安）</h2>
-            <p id="furusatoLimit" class="big-number">-- 円まで可能</p>
-            <p class="sub-text">
-              年収と家族構成などをざっくり想定した、かなりざっくりの目安です。
-            </p>
-          </div>
-
           <div class="card" id="furusatoNavCard">
             <h2>🍖 ふるさと納税 診断テスト</h2>
-            <p class="sub-text">3つの質問で、あなたのふるさと納税スタイルを診断！</p>
+            <p class="sub-text">4つの質問に答えるだけで、あなたのふるさと納税の上限目安がわかります。</p>
 
             <div id="furusatoProgress" class="progress-bar hidden">
               <div id="progressFill" class="progress-fill"></div>
@@ -524,48 +492,127 @@
               🚀 診断スタート！
             </button>
 
-            <div id="q1-block" class="question-block hidden fun-question">
-              <div class="question-icon">💼</div>
-              <h3>副業探偵</h3>
-              <p class="question-label">Q1. 副業収入やフリーランス収入はありますか？</p>
-              <div class="chip-row">
-                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="yes">YES 😎</button>
-                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="no">NO 🙅‍♂️</button>
+            <!-- Q1 年収 -->
+            <div id="q1-furu-block" class="question-block hidden fun-question">
+              <div class="question-icon">💰</div>
+              <h3>年収を教えてください</h3>
+              <p class="question-label">Q1. あなたの年間の給与収入（額面）に近いものを選んでください。</p>
+              <div class="chip-col">
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="300">① 〜300万円</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="400">② 300〜400万円</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="500">③ 400〜500万円</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="600">④ 500〜600万円</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="700">⑤ 600〜700万円</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="800">⑥ 700〜800万円</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="1" data-val="900">⑦ 800万円以上</button>
               </div>
             </div>
 
-            <div id="q2-block" class="question-block hidden fun-question">
-              <div class="question-icon">🏥</div>
-              <h3>医療費探偵</h3>
-              <p class="question-label">Q2. 医療費を年間10万円以上払いましたか？</p>
-              <div class="chip-row">
-                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="yes">YES 💊</button>
-                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="no">NO 😌</button>
+            <!-- Q2 家族構成 -->
+            <div id="q2-furu-block" class="question-block hidden fun-question">
+              <div class="question-icon">👨‍👩‍👧‍👦</div>
+              <h3>家族構成</h3>
+              <p class="question-label">Q2. あなたの家族構成を教えてください。</p>
+              <div class="chip-col">
+                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="single">① 独身</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="married_no_dep">② 配偶者あり（扶養なし）</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="married_dep">③ 配偶者あり（扶養あり）</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="married_1child">④ 配偶者＋子ども1人</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="2" data-val="married_2child">⑤ 配偶者＋子ども2人以上</button>
               </div>
             </div>
 
-            <div id="q3-block" class="question-block hidden fun-question">
-              <div class="question-icon">🗺️</div>
-              <h3>寄付マスター</h3>
-              <p class="question-label">Q3. 寄付したい自治体は6ヶ所以上ですか？</p>
-              <div class="chip-row">
-                <button type="button" class="chip furusato-chip fun-chip" data-q="3" data-val="yes">YES 🌟</button>
-                <button type="button" class="chip furusato-chip fun-chip" data-q="3" data-val="no">NO 🤔</button>
+            <!-- Q3 社会保険料 -->
+            <div id="q3-furu-block" class="question-block hidden fun-question">
+              <div class="question-icon">🏢</div>
+              <h3>社会保険料の負担</h3>
+              <p class="question-label">Q3. 給与から引かれている健康保険・年金などの負担です。</p>
+              <div class="chip-col">
+                <button type="button" class="chip furusato-chip fun-chip" data-q="3" data-val="company_normal">① 会社員（一般的な会社）</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="3" data-val="company_high">② 会社員（高めの給与）</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="3" data-val="freelance">③ 自営業・フリーランス</button>
+              </div>
+            </div>
+
+            <!-- Q4 住宅ローン控除 -->
+            <div id="q4-furu-block" class="question-block hidden fun-question">
+              <div class="question-icon">🏠</div>
+              <h3>住宅ローン控除</h3>
+              <p class="question-label">Q4. 住宅ローン控除はありますか？</p>
+              <div class="chip-col">
+                <button type="button" class="chip furusato-chip fun-chip" data-q="4" data-val="yes">① ある</button>
+                <button type="button" class="chip furusato-chip fun-chip" data-q="4" data-val="no">② ない</button>
               </div>
             </div>
 
             <div id="furusatoResultBlock" class="result-box hidden fun-result">
               <div class="result-icon">🎉</div>
               <p class="label">診断結果</p>
-              <p id="furusatoResultMain" class="result-main">
-                --
-              </p>
-              <p id="furusatoResultDetail" class="result-detail">
-                --
-              </p>
-              <button id="resetFurusatoNav" class="ghost-button fun-reset" style="margin-top: 10px; width: 100%;">
+              <p class="result-main">あなたの目安上限額は</p>
+              <h3 id="furusato-final-limit" style="font-size: 28px; color: #e11d48; margin: 8px 0;">--</h3>
+              <p class="result-main">です。</p>
+              <div style="background: rgba(255,255,255,0.7); padding: 12px; border-radius: 8px; margin-top: 12px; text-align: left;">
+                <p>つまり、<br><strong id="furusato-final-gift">--</strong> を<br><strong>実質2,000円</strong>で受け取れます。</p>
+                <p style="font-size: 11px; color: #666; margin-top: 4px;">※あくまで目安です。<span id="loan-caution" class="hidden">住宅ローン控除があるため、上限が少し下がる可能性があります。</span></p>
+              </div>
+              <div style="margin-top: 12px; text-align: left; font-size: 13px;">
+                <p id="furusato-final-method">--</p>
+              </div>
+              <button id="resetFurusatoNav" class="ghost-button fun-reset" style="margin-top: 16px; width: 100%;">
                 🔄 もう一度診断する
               </button>
+            </div>
+          </div>
+
+          <div class="card qa-card">
+            <h2>💡 ふるさと納税 よくある質問</h2>
+            <div class="qa-list">
+              <details class="qa-item">
+                <summary>Q1. ふるさと納税に上限額などあるのですか？</summary>
+                <div class="qa-answer">
+                  <p>はい、<strong>ふるさと納税には上限額があります。</strong></p>
+                  <p>これは<strong>ふるさと納税</strong>の仕組みで、<strong>年収や家族構成によって「税金から控除される上限」が決まっています。</strong></p>
+                  <p>ふるさと納税は（寄付額 − 2,000円）が所得税・住民税から控除されますが、👉 <strong>控除できる金額に上限がある</strong>というルールです。</p>
+                </div>
+              </details>
+              
+              <details class="qa-item">
+                <summary>Q2. 上限を超えるとどうなる？</summary>
+                <div class="qa-answer">
+                  <p>例えば上限が<strong>50,000円</strong>の人が、80,000円寄付した場合：</p>
+                  <ul>
+                    <li>50,000円 → 控除対象</li>
+                    <li>30,000円 → 自己負担</li>
+                  </ul>
+                  <p>つまり、自己負担が2,000円から32,000円になります。</p>
+                </div>
+              </details>
+
+              <details class="qa-item">
+                <summary>Q3. 上限が決まる要素</summary>
+                <div class="qa-answer">
+                  <p>主にこの4つです。</p>
+                  <ol>
+                    <li>1️⃣ <strong>年収</strong></li>
+                    <li>2️⃣ <strong>家族構成（扶養）</strong></li>
+                    <li>3️⃣ <strong>社会保険料</strong></li>
+                    <li>4️⃣ <strong>住宅ローン控除の有無</strong></li>
+                  </ol>
+                  <p>ふるさと納税診断テストにチャレンジしてみよう！！🌟</p>
+                </div>
+              </details>
+
+              <details class="qa-item">
+                <summary>Q4. 「実質2,000円で返礼品を受け取れる」とは？</summary>
+                <div class="qa-answer">
+                  <p><strong>ふるさと納税</strong>は、寄付した金額のうち<strong>2,000円を除いた金額</strong>が<strong>税金（所得税＋住民税）から控除</strong>される仕組みです。</p>
+                  <p>### 例：59,000円寄付した場合<br>
+                  寄付額 59,000円<br>
+                  税金控除 57,000円<br>
+                  自己負担 2,000円</p>
+                  <p>つまり、59,000円の寄付をすると、57,000円は翌年の税金が減り、実際の負担は<strong>2,000円</strong>。その代わりに👉 <strong>59,000円相当の返礼品</strong>（肉・米・家電など）を受け取れるという意味です。</p>
+                </div>
+              </details>
             </div>
           </div>
         </section>
@@ -573,11 +620,7 @@
 
       <!-- Bottom tab bar -->
       <nav class="tab-bar">
-        <button class="tab-button active" data-target="home">
-          <span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
-          <span class="tab-label">ホーム</span>
-        </button>
-        <button class="tab-button" data-target="calendar">
+        <button class="tab-button active" data-target="calendar">
           <span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
           <span class="tab-label">カレンダー</span>
         </button>
