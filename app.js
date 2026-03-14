@@ -624,7 +624,7 @@ function refreshHomeView() {
   if (!user) return;
 
   const salary = user.salary || 0;
-  const yearlySalary = salary;
+  const yearlySalary = salary * 12;
 
   let bonusTimes = 0;
   if (user.bonusType === "summer" || user.bonusType === "winter") {
@@ -634,24 +634,11 @@ function refreshHomeView() {
   }
 
   const bonusAmount = user.bonusAmount || 0;
-  const predicted =
-    yearlySalary + bonusTimes * (bonusAmount / 10); // ざっくり調整
+  const predicted = yearlySalary + bonusTimes * bonusAmount;
 
-  $("predictedIncome").textContent =
-    predicted > 0 ? `${Math.round(predicted)} 万円` : "-- 万円";
-
-  // 2年目の壁
-  const alertMain = $("secondYearAlertMain");
-  const alertDetail = $("secondYearAlertDetail");
-  if (user.careerYear <= 1) {
-    alertMain.textContent = "来年6月から住民税がスタートしそうです。";
-    alertDetail.textContent = "手取り −18,000円/月 前後の変化が出ることが多いです。";
-  } else if (user.careerYear === 2) {
-    alertMain.textContent = "今がちょうど2年目の壁ゾーンです。";
-    alertDetail.textContent = "住民税で手取りが少し減る時期なので、出費を意識できると安心です。";
-  } else {
-    alertMain.textContent = "住民税はすでに毎月の手取りに反映されています。";
-    alertDetail.textContent = "大きな変化は小さいですが、年末調整の通知には目を通しておきましょう。";
+  if ($("predictedIncome")) {
+    $("predictedIncome").textContent =
+      predicted > 0 ? `${Math.round(predicted)} 万円` : "-- 万円";
   }
 
   // 不安メーター
@@ -679,15 +666,15 @@ function refreshHomeView() {
 
   // AIキャリア分析
   const list = $("careerAnalysisList");
-  list.innerHTML = "";
-  const points = buildCareerAnalysis(user);
-  points.forEach((p) => {
-    const li = document.createElement("li");
-    li.textContent = p;
-    list.appendChild(li);
-  });
-
-  refreshHomeAnalysis();
+  if (list) {
+    list.innerHTML = "";
+    const points = buildCareerAnalysis(user);
+    points.forEach((p) => {
+      const li = document.createElement("li");
+      li.textContent = p;
+      list.appendChild(li);
+    });
+  }
 }
 
 function buildCareerAnalysis(user) {
@@ -716,29 +703,7 @@ function buildCareerAnalysis(user) {
 }
 
 function refreshHomeAnalysis() {
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${String(
-    now.getMonth() + 1
-  ).padStart(2, "0")}`;
-  const monthEvents = state.events.filter(
-    (ev) => ev.date && ev.date.startsWith(ym)
-  );
-  const total = monthEvents.reduce((sum, ev) => sum + (ev.amount || 0), 0);
-
-  const el = $("thisMonthAnalysis");
-  if (monthEvents.length === 0) {
-    el.textContent =
-      "今月の大きな出費は登録されていません。余裕のある月に先取り貯金ができるかもしれません。";
-  } else if (total < 10) {
-    el.textContent =
-      "今月は出費が少なめです。来月以降のイベントをカレンダーに追加して、余裕をキープしましょう。";
-  } else if (total < 30) {
-    el.textContent =
-      "今月はやや出費が多めです。2年目の壁やボーナス前後の変化も合わせてチェックしてみましょう。";
-  } else {
-    el.textContent =
-      "今月はかなり大きな出費があります。支払い方法や分割回数を見直すと安心度が上がるかもしれません。";
-  }
+  // Removed logic for thisMonthAnalysis
 }
 
 // ---------- Income forecast ----------
@@ -782,7 +747,7 @@ function renderIncomeLine(yearOffset) {
 
   const baseSalary = user.salary || 0;
   const yearlyGrowth = user.industry === "it" ? 0.05 : 0.02;
-  const salaryThisYear = baseSalary * (1 + yearlyGrowth * yearOffset);
+  const salaryThisYearMonthly = baseSalary * (1 + yearlyGrowth * yearOffset);
 
   let bonusTimes = 0;
   if (user.bonusType === "summer" || user.bonusType === "winter") {
@@ -790,16 +755,16 @@ function renderIncomeLine(yearOffset) {
   } else if (user.bonusType === "both") {
     bonusTimes = 2;
   }
-  const bonusPer = user.bonusAmount || (baseSalary / 4);
+  const bonusPer = user.bonusAmount || baseSalary;
   const bonusTotal = bonusTimes * bonusPer;
 
   const months = Array.from({ length: 12 }, (_, i) => i);
 
-  const taxBaseIncome = salaryThisYear + bonusTotal / 10;
+  const taxBaseIncome = salaryThisYearMonthly * 12 + bonusTotal;
   const taxRate = user.careerYear + yearOffset >= 2 ? 0.23 : 0.18;
 
   const series = months.map((m) => {
-    const monthSalary = salaryThisYear / 12;
+    const monthSalary = salaryThisYearMonthly;
     const isBonusMonth =
       bonusTimes === 2
         ? m === 5 || m === 11
@@ -986,64 +951,23 @@ function buildTaxBreakdown(taxIncome, user, yearOffset) {
 }
 
 function refreshStabilityText() {
-  const user = state.user;
-  const el = $("stabilityText");
-  if (!user) return;
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${String(
-    now.getMonth() + 1
-  ).padStart(2, "0")}`;
-  const monthEvents = state.events.filter(
-    (ev) => ev.date && ev.date.startsWith(ym)
-  );
-  const totalOut = monthEvents.reduce(
-    (sum, ev) => sum + (ev.amount || 0),
-    0
-  );
-  const monthlyTakeHome = (user.salary || 0) / 12;
-
-  if (totalOut === 0) {
-    el.textContent =
-      "今月の大きな出費は登録されていません。余裕があるうちに将来のイベントも少しずつ登録しておきましょう。";
-  } else {
-    const ratio = totalOut / (monthlyTakeHome || 1);
-    if (ratio < 0.3) {
-      el.textContent =
-        "出費は手取りの3割未満。安定ゾーンです。貯金や自己投資にまわせる余白もありそうです。";
-    } else if (ratio < 0.6) {
-      el.textContent =
-        "出費は手取りの3〜6割ほど。もう少し増えても大丈夫ですが、2年目の壁タイミングには注意しましょう。";
-    } else {
-      el.textContent =
-        "出費が手取りの多くを占めています。分割払いやタイミング調整で、ピークをならすと安心度が上がります。";
-    }
-  }
+  // Removed stability logic
 }
 
 // ---------- Furusato ----------
 
 function refreshFurusatoView() {
-  const user = state.user;
-  if (!user) return;
-
-  const yearly = (user.salary || 0) * 10000;
-  const limit = Math.round(yearly * 0.08 / 1000) * 1000;
-
-  $("furusatoLimit").textContent =
-    limit > 0 ? `${limit.toLocaleString("ja-JP")} 円まで可能` : "-- 円まで可能";
-
   const startBtn = $("startFurusatoNav");
   startBtn.addEventListener("click", () => {
     startBtn.classList.add("hidden");
     $("furusatoProgress").classList.remove("hidden");
     $("progressFill").style.width = "0%";
-    $("q1-block").classList.remove("hidden");
+    $("q1-furu-block").classList.remove("hidden");
   });
 
   const chips = document.querySelectorAll(".furusato-chip");
   chips.forEach(chip => {
     chip.addEventListener("click", () => {
-      // Find siblings and remove selected
       const siblings = chip.parentElement.querySelectorAll(".chip");
       siblings.forEach(s => s.classList.remove("selected"));
       chip.classList.add("selected");
@@ -1051,15 +975,19 @@ function refreshFurusatoView() {
       const qNum = parseInt(chip.dataset.q, 10);
       
       if (qNum === 1) {
-        $("q1-block").classList.add("hidden");
-        $("q2-block").classList.remove("hidden");
-        $("progressFill").style.width = "33%";
+        $("q1-furu-block").classList.add("hidden");
+        $("q2-furu-block").classList.remove("hidden");
+        $("progressFill").style.width = "25%";
       } else if (qNum === 2) {
-        $("q2-block").classList.add("hidden");
-        $("q3-block").classList.remove("hidden");
-        $("progressFill").style.width = "66%";
+        $("q2-furu-block").classList.add("hidden");
+        $("q3-furu-block").classList.remove("hidden");
+        $("progressFill").style.width = "50%";
       } else if (qNum === 3) {
-        $("q3-block").classList.add("hidden");
+        $("q3-furu-block").classList.add("hidden");
+        $("q4-furu-block").classList.remove("hidden");
+        $("progressFill").style.width = "75%";
+      } else if (qNum === 4) {
+        $("q4-furu-block").classList.add("hidden");
         showFurusatoResult();
         $("progressFill").style.width = "100%";
       }
@@ -1070,34 +998,51 @@ function refreshFurusatoView() {
     chips.forEach(c => c.classList.remove("selected"));
     startBtn.classList.remove("hidden");
     $("furusatoProgress").classList.add("hidden");
-    $("q1-block").classList.add("hidden");
-    $("q2-block").classList.add("hidden");
-    $("q3-block").classList.add("hidden");
+    $("q1-furu-block").classList.add("hidden");
+    $("q2-furu-block").classList.add("hidden");
+    $("q3-furu-block").classList.add("hidden");
+    $("q4-furu-block").classList.add("hidden");
     $("furusatoResultBlock").classList.add("hidden");
   });
 }
 
 function showFurusatoResult() {
-  const q1 = document.querySelector('.furusato-chip[data-q="1"].selected')?.dataset.val === 'yes';
-  const q2 = document.querySelector('.furusato-chip[data-q="2"].selected')?.dataset.val === 'yes';
-  const q3 = document.querySelector('.furusato-chip[data-q="3"].selected')?.dataset.val === 'yes';
+  const q1 = document.querySelector('.furusato-chip[data-q="1"].selected')?.dataset.val || "300";
+  const q2 = document.querySelector('.furusato-chip[data-q="2"].selected')?.dataset.val || "single";
+  const q3 = document.querySelector('.furusato-chip[data-q="3"].selected')?.dataset.val || "company_normal";
+  const q4 = document.querySelector('.furusato-chip[data-q="4"].selected')?.dataset.val === "yes";
 
-  const needsKakutei = q1 || q2 || q3;
-  const main = $("furusatoResultMain");
-  const detail = $("furusatoResultDetail");
+  let limit = 28000;
+  const inc = parseInt(q1);
+  if (inc <= 300) limit = 28000;
+  else if (inc <= 400) limit = 42000;
+  else if (inc <= 500) limit = 61000;
+  else if (inc <= 600) limit = 77000;
+  else if (inc <= 700) limit = 108000;
+  else limit = 130000;
+  
+  if (q2 === "married_dep" || q2 === "married_1child") limit = limit - 10000;
+  if (q2 === "married_2child") limit = limit - 20000;
+  
+  limit = Math.max(10000, limit);
+  
+  const returnGoods = limit - 2000;
 
   $("furusatoResultBlock").classList.remove("hidden");
-
-  if (needsKakutei) {
-    main.textContent = "確定申告 が必要になりそうです。";
-    let reasons = [];
-    if (q1) reasons.push("副業収入等がある");
-    if (q2) reasons.push("医療費控除を受ける");
-    if (q3) reasons.push("6自治体以上に寄付する");
-    detail.textContent = `${reasons.join("、")}ため、ワンストップ特例ではなく確定申告を行いましょう。`;
+  $("furusato-final-limit").textContent = `約 ${limit.toLocaleString("ja-JP")}円`;
+  $("furusato-final-gift").textContent = `${returnGoods.toLocaleString("ja-JP")}円分の返礼品`;
+  
+  if (q4) {
+    $("loan-caution").classList.remove("hidden");
   } else {
-    main.textContent = "ワンストップ特例申請 が使えそうです。";
-    detail.textContent = "会社員で条件をすべて満たしているため、確定申告なしでふるさと納税が完了します。書類の郵送やオンライン申請を忘れずに！";
+    $("loan-caution").classList.add("hidden");
+  }
+
+  const methodEl = $("furusato-final-method");
+  if (q3 === "freelance") {
+    methodEl.innerHTML = "また、申請方法は、自営業のため <strong>確定申告</strong> が必要です。<br>書類の準備を余裕を持って行いましょう！";
+  } else {
+    methodEl.innerHTML = "また、申請方法は、<strong>ワンストップ特例申請</strong> が使えそうです。<br>会社員で条件をすべて満たしているため、確定申告なしでふるさと納税が完了します。書類の郵送やオンライン申請を忘れずに！";
   }
 }
 
